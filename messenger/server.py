@@ -15,94 +15,14 @@ import http.server
 import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
-import uuid
-import secrets
-import copy
+from messenger.user import User, AuthToken, RegisteredUsers, generate_auth_token
 
 
 #registered_users = []  # TODO store users as User objects with login, password, user_id
-#auth_token = []        # TODO store user's auth_token as objects with user_id, auth_token {user_id = 10, auth_token="fhhhdas123"}
-
-
-class RegisteredUsers:
-    store = []
-
-    def add_user(self, user):
-        self.store.append(user)
-
-    def show_users(self):
-        print('Registered users:')
-        for user in self.store:
-            print('login: {}'.format(user.get_login()))
-
-    def check_login_in_store(self, login):
-        for user in self.store:
-            if user.get_login() == login:
-                return True
-
-
-class AuthToken:
-
-    store = []
-    def add_user(self, current_user):
-        user = copy.deepcopy(current_user)
-        auth_token = generate_auth_token()
-        user.auth_token = []
-        user.auth_token.append(auth_token)
-        print('user_auth_token_added: {}'.format(user.auth_token))
-        delattr(user, 'login')
-        delattr(user, 'password')
-        self.store.append(user)
-
-    def add_token_to_user(self, current_user):
-        for user in self.store:
-            if user.get_user_id() == current_user.get_user_id():
-                new_auth_token = generate_auth_token()
-                user.auth_token.append(new_auth_token)
-
-    def get_tokens(self, current_user):
-        for user in self.store:
-            if user.get_user_id() == current_user.get_user_id():
-                return user.auth_token
-
-    def show_user_tokens(self):
-        for user in self.store:
-            print('user_id: {}'.format(user.get_user_id()))
-            print('user_auth_tokens: {}'.format(auth_token.get_tokens(user)))
-
-class User:
-
-    def __init__(self, login, password):
-        self.login = login
-        self.password = password
-        self.user_id = generate_user_id()
-
-    def get_login(self):
-        return self.login
-
-    def set_login(self, new_login):
-        self.login = new_login
-
-    def get_password(self):
-        return self.password
-
-    def set_password(self, new_password):
-        self.password = new_password
-
-    def get_user_id(self):
-        return self.user_id
-
-
-def generate_user_id():
-    return uuid.uuid4()
-
-
-def generate_auth_token():
-    return secrets.token_urlsafe()
-
+#auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
 
 registered_users = RegisteredUsers()
-auth_token = AuthToken()
+auth_token_store = AuthToken()
 
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -114,6 +34,8 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.handle_login()
         if self.path == "/sendMessage":
             self.handle_send_message()
+        if self.path == "/readMessage":
+            self.handle_read_message()
 
     def handle_register(self):
         self.send_response(200)
@@ -124,30 +46,28 @@ class ServerHandler(BaseHTTPRequestHandler):
         login = json.loads(post_body).get('login')
         password = json.loads(post_body).get('password')
         print(post_body)
-        user = User(login, password)
+
         # TODO handle other errors: missing password, missing login, etc...
-        if user.get_login() is None:
+        if len(login) == 0:
             self.wfile.write(str.encode("{\"result\" : \"please, enter your login\"}"))
             return
-        if registered_users.check_login_in_store(user.get_login()):
+        if registered_users.is_login_in_store(login):
             self.wfile.write(str.encode("{\"result\" : \"user_already_registered\"}"))
             return
-        if user.get_password() is None:
+        if len(password) == 0:
             self.wfile.write(str.encode("{\"result\" : \"please, enter your password\"}"))
             return
-        if len(user.get_password()) < 6:
+        if len(password) < 6:
             self.wfile.write(str.encode("{\"result\" : \"password must be 6 or more characters long\"}"))
             return
-
-        print('login: {}'.format(user.get_login()))
-        print('password: {}'.format(user.get_password()))
-        print('user_id: {}'.format(user.get_user_id()))
+        user = User(login, password)
+        #print('login: {}'.format(user.get_login()))
+        #print('password: {}'.format(user.get_password()))
+        #print('user_id: {}'.format(user.get_id()))
         # TODO store users as objects with login, user_id, password etc..
 
         registered_users.add_user(user)
-        auth_token.add_user(user)
         registered_users.show_users()
-        auth_token.show_user_tokens()
 
         self.wfile.write(str.encode("{\"result\" : \"user registered\"}"))
 
@@ -161,9 +81,25 @@ class ServerHandler(BaseHTTPRequestHandler):
         password = json.loads(post_body)['password']
         # TODO check password
         # TODO handle other errors: missing password, missing login, etc...
-        if login in registered_users:
-            auth_token = "TODO generate token"
-            self.wfile.write(str.encode("{\"result\" : \"ok\", \"user_id\": 1337, \"auth_token\" : \"" + auth_token + "\"}"))
+        if len(login) == 0:
+            self.wfile.write(str.encode("{\"result\" : \"please, enter your login\"}"))
+            return
+        if len(password) == 0:
+            self.wfile.write(str.encode("{\"result\" : \"please, enter your password\"}"))
+            return
+        if registered_users.is_login_in_store(login):
+            user = registered_users.get_user(login)
+            if not user.check_password(password):
+                self.wfile.write(str.encode("{\"result\" : \"wrong password\"}"))
+                return
+
+            auth_token = generate_auth_token()
+            auth_token_store.add_user(user, auth_token)
+            self.wfile.write(str.encode(
+                "\"result\" : \"ok\", \"user_id\" : {}, \"auth_token\" : \" {} \"".format(
+                user.get_id(), auth_token
+            )))
+            auth_token_store.show_user_tokens()
             return
 
         self.wfile.write(str.encode("{\"result\" : \"unknown_login\"}"))
@@ -174,8 +110,50 @@ class ServerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         content_len = int(self.headers.get('Content-Length'))
         post_body = (self.rfile.read(content_len)).decode()
+        auth_token = json.loads(post_body)['auth_token']
+        to_user_id = json.loads(post_body)['to_user_id'] # checking have to be done on the client-side? Why not?
+        message = json.loads(post_body)['message']
+        if not auth_token_store.is_token_in_store(auth_token):
+            self.wfile.write(str.encode(
+                "{\"result\" : \"please, register your account\"}"
+            ))
+            return
+        if not registered_users.is_id_in_store(to_user_id):
+            self.wfile.write(str.encode(
+                "{\"result\" : \"user you have tried to send a message isn't registered\"}"
+            ))
+            return
+        if len(message) == 0:
+            self.wfile.write(str.encode("{\"result\" : \"please, enter your message\"}"))
+            return
 
-        self.wfile.write(str.encode("{\"result\" : \"not_implemented\"}"))
+
+        self.wfile.write(str.encode("{\"result\" : \"message has delivered\"}"))
+
+    def handle_read_message(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        content_len = int(self.headers.get('Content-Length'))
+        post_body = (self.rfile.read(content_len)).decode()
+        auth_token = json.loads(post_body)['auth_token']
+        to_user_id = json.loads(post_body)['to_user_id']  # check have to be done on the client-side? Why not?
+        message = json.loads(post_body)['message']
+        if len(message) == 0:
+            self.wfile.write(str.encode("{\"result\" : \"please, enter your message\"}"))
+            return
+        if not registered_users.is_id_in_store(to_user_id):
+            self.wfile.write(str.encode(
+                "{\"result\" : \"user you have tried to send a message isn't registered\"}"
+            ))
+            return
+        if not auth_token_store.is_token_in_store(auth_token):
+            self.wfile.write(str.encode(
+                "{\"result\" : \"please, register your account\"}"
+            ))
+            return
+
+        self.wfile.write(str.encode("{\"result\" : \"message has delivered\"}"))
 
 
 def run_server():
