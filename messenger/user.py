@@ -27,9 +27,14 @@ class RegisteredUsers:
                 print('yeeeeees')
                 return True
 
-    def get_user(self, login):
+    def get_user_by_login(self, login):
         for user in self.store:
             if user.get_login() == login:
+                return user
+
+    def get_user_by_id(self, user_id):
+        for user in self.store:
+            if user.get_id() == user_id:
                 return user
 
 
@@ -60,9 +65,14 @@ class AuthToken:
             print('user_id: {}'.format(user.get_id()))
             print('user_auth_tokens: {}'.format(self.get_user_tokens(user)))
 
-    def get_user(self, login):
+    def get_user_by_login(self, login):
         for user in self.store:
             if user.get_login() == login:
+                return user
+
+    def get_user_by_auth_token(self, auth_token):
+        for user in self.store:
+            if auth_token in self.get_user_tokens(user):
                 return user
 
     def is_token_in_store(self, auth_token):
@@ -97,6 +107,10 @@ class User:
 
     def get_id(self):
         return self.user_id
+
+    def set_avatar(self, url):
+        self.avatar = url
+
 
 
 

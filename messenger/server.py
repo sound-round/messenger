@@ -16,6 +16,7 @@ import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from messenger.user import User, AuthToken, RegisteredUsers, generate_auth_token
+import validators
 
 
 #registered_users = []  # TODO store users as User objects with login, password, user_id
@@ -36,6 +37,10 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.handle_send_message()
         if self.path == "/readMessage":
             self.handle_read_message()
+        if self.path == "/getUser":
+            self.handle_get_user()
+        if self.path == "/setAvatar":
+            self.handle_set_avatar()
 
     def handle_register(self):
         self.send_response(200)
@@ -88,7 +93,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(str.encode("{\"result\" : \"please, enter your password\"}"))
             return
         if registered_users.is_login_in_store(login):
-            user = registered_users.get_user(login)
+            user = registered_users.get_user_by_login(login)
             if not user.check_password(password):
                 self.wfile.write(str.encode("{\"result\" : \"wrong password\"}"))
                 return
@@ -130,30 +135,69 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         self.wfile.write(str.encode("{\"result\" : \"message has delivered\"}"))
 
+
+
+
+
     def handle_read_message(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         content_len = int(self.headers.get('Content-Length'))
         post_body = (self.rfile.read(content_len)).decode()
-        auth_token = json.loads(post_body)['auth_token']
-        to_user_id = json.loads(post_body)['to_user_id']  # check have to be done on the client-side? Why not?
+        since_date = json.loads(post_body)['auth_token']
         message = json.loads(post_body)['message']
-        if len(message) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter your message\"}"))
-            return
-        if not registered_users.is_id_in_store(to_user_id):
-            self.wfile.write(str.encode(
-                "{\"result\" : \"user you have tried to send a message isn't registered\"}"
-            ))
-            return
+
+
+        self.wfile.write(str.encode("{\"result\" : \"not implemented\"}"))
+
+    #setAvatar - set avatar - params: auth_token, avatar_url
+    def handle_set_avatar(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        content_len = int(self.headers.get('Content-Length'))
+        post_body = (self.rfile.read(content_len)).decode()
+        auth_token = json.loads(post_body)['auth_token']
+        avatar_url = json.loads(post_body)['avatar_url']
         if not auth_token_store.is_token_in_store(auth_token):
             self.wfile.write(str.encode(
                 "{\"result\" : \"please, register your account\"}"
             ))
             return
+        if len(avatar_url) == 0:
+            self.wfile.write(str.encode("{\"result\" : \"please, enter url of your avatar\"}"))
+            return
+        if not validators.url(avatar_url):  # how to make it work in the right way?
+            self.wfile.write(str.encode("{\"result\" : \"url is not valid\"}"))
+            return
 
-        self.wfile.write(str.encode("{\"result\" : \"message has delivered\"}"))
+        user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
+        user = registered_users.get_user_by_id(user_id)
+        user.set_avatar(avatar_url)
+        self.wfile.write(str.encode("{\"result\" : \"the avatar has been set\"}"))
+
+
+    # 5) /getUser - get info about user - params: auth_token, user_id
+    #             - result: login: String, last_active: Date, avatar_url: String
+    def handle_get_user(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        content_len = int(self.headers.get('Content-Length'))
+        post_body = (self.rfile.read(content_len)).decode()
+        auth_token = json.loads(post_body)['auth_token']
+        user_id_to_get = json.loads(post_body)['user_id_to_get']
+        if not auth_token_store.is_token_in_store(auth_token):
+            self.wfile.write(str.encode(
+                "{\"result\" : \"please, register your account\"}"
+            ))
+            return
+        if not registered_users.is_id_in_store(user_id_to_get):
+            self.wfile.write(str.encode(
+                "{\"result\" : \"user isn't registered\"}"
+            ))
+            return
 
 
 def run_server():
