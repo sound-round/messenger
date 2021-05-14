@@ -3,7 +3,6 @@ import secrets
 import copy
 
 
-
 class RegisteredUsers:
     store = []
 
@@ -24,7 +23,6 @@ class RegisteredUsers:
     def is_id_in_store(self, user_id):
         for user in self.store:
             if user.get_id() == user_id:
-                print('yeeeeees')
                 return True
 
     def get_user_by_login(self, login):
@@ -89,6 +87,7 @@ class User:
         self.login = login
         self.password = password
         self.user_id = str(generate_user_id())
+        self.avatar_url = None
 
     def get_login(self):
         return self.login
@@ -109,7 +108,10 @@ class User:
         return self.user_id
 
     def set_avatar(self, url):
-        self.avatar = url
+        self.avatar_url = url
+
+    def get_avatar(self):
+        return self.avatar_url
 
 
 

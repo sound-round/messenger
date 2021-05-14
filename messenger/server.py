@@ -198,6 +198,14 @@ class ServerHandler(BaseHTTPRequestHandler):
                 "{\"result\" : \"user isn't registered\"}"
             ))
             return
+        user = registered_users.get_user_by_id(user_id_to_get)
+        last_active = None  # How should it be implemented?
+
+        self.wfile.write(str.encode(
+            "\"result\" :\n \"Login: {}\nLast active: {}\nAvatar url: {}\"". format(
+                user.get_login(), last_active, user.get_avatar(),
+            )
+        ))
 
 
 def run_server():
