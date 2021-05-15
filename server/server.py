@@ -15,7 +15,7 @@ import http.server
 import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
-from messenger.user import User, AuthToken, RegisteredUsers, generate_auth_token
+from common.user import User, AuthToken, RegisteredUsers, generate_auth_token
 import validators
 
 
