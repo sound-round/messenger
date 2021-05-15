@@ -54,16 +54,16 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         # TODO handle other errors: missing password, missing login, etc...
         if len(login) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter your login\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"login_is_missing\"}"))
             return
         if registered_users.is_login_in_store(login):
             self.wfile.write(str.encode("{\"result\" : \"user_already_registered\"}"))
             return
         if len(password) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter your password\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"password_is_missing\"}"))
             return
         if len(password) < 6:
-            self.wfile.write(str.encode("{\"result\" : \"password must be 6 or more characters long\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"password_must_be_6_or_more_characters_long\"}"))
             return
         user = User(login, password)
         #print('login: {}'.format(user.get_login()))
@@ -74,7 +74,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         registered_users.add_user(user)
         registered_users.show_users()
 
-        self.wfile.write(str.encode("{\"result\" : \"user registered\"}"))
+        self.wfile.write(str.encode("{\"result\" : \"user_registered\"}"))
 
     def handle_login(self):
         self.send_response(200)
@@ -87,15 +87,15 @@ class ServerHandler(BaseHTTPRequestHandler):
         # TODO check password
         # TODO handle other errors: missing password, missing login, etc...
         if len(login) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter your login\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"login_is_missing\"}"))
             return
         if len(password) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter your password\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"password_is_missing\"}"))
             return
         if registered_users.is_login_in_store(login):
             user = registered_users.get_user_by_login(login)
             if not user.check_password(password):
-                self.wfile.write(str.encode("{\"result\" : \"wrong password\"}"))
+                self.wfile.write(str.encode("{\"result\" : \"wrong_password\"}"))
                 return
 
             auth_token = generate_auth_token()
@@ -120,20 +120,20 @@ class ServerHandler(BaseHTTPRequestHandler):
         message = json.loads(post_body)['message']
         if not auth_token_store.is_token_in_store(auth_token):
             self.wfile.write(str.encode(
-                "{\"result\" : \"please, register your account\"}"
+                "{\"result\" : \"unknown_auth_token\"}"
             ))
             return
         if not registered_users.is_id_in_store(to_user_id):
             self.wfile.write(str.encode(
-                "{\"result\" : \"user you have tried to send a message isn't registered\"}"
+                "{\"result\" : \"user_is_missing\"}"
             ))
             return
         if len(message) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter your message\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"message_is_missing\"}"))
             return
 
 
-        self.wfile.write(str.encode("{\"result\" : \"message has delivered\"}"))
+        self.wfile.write(str.encode("{\"result\" : \"message_has_delivered\"}"))
 
 
 
@@ -162,20 +162,20 @@ class ServerHandler(BaseHTTPRequestHandler):
         avatar_url = json.loads(post_body)['avatar_url']
         if not auth_token_store.is_token_in_store(auth_token):
             self.wfile.write(str.encode(
-                "{\"result\" : \"please, register your account\"}"
+                "{\"result\" : \"unknown_auth_token\"}"
             ))
             return
         if len(avatar_url) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"please, enter url of your avatar\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"url_is_missing\"}"))
             return
         if not validators.url(avatar_url):  # how to make it work in the right way?
-            self.wfile.write(str.encode("{\"result\" : \"url is not valid\"}"))
+            self.wfile.write(str.encode("{\"result\" : \"url_is_not_valid\"}"))
             return
 
         user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
         user = registered_users.get_user_by_id(user_id)
         user.set_avatar(avatar_url)
-        self.wfile.write(str.encode("{\"result\" : \"the avatar has been set\"}"))
+        self.wfile.write(str.encode("{\"result\" : \"avatar_has_been_set\"}"))
 
 
     # 5) /getUser - get info about user - params: auth_token, user_id
@@ -190,12 +190,12 @@ class ServerHandler(BaseHTTPRequestHandler):
         user_id_to_get = json.loads(post_body)['user_id_to_get']
         if not auth_token_store.is_token_in_store(auth_token):
             self.wfile.write(str.encode(
-                "{\"result\" : \"please, register your account\"}"
+                "{\"result\" : \"unknown_auth_token\"}"
             ))
             return
         if not registered_users.is_id_in_store(user_id_to_get):
             self.wfile.write(str.encode(
-                "{\"result\" : \"user isn't registered\"}"
+                "{\"result\" : \"user_is_missing\"}"
             ))
             return
         user = registered_users.get_user_by_id(user_id_to_get)
