@@ -3,7 +3,7 @@ import secrets
 import copy
 
 
-class RegisteredUsers:
+class RegisteredUsersManager:
     store = []
 
     def add_user(self, user):
@@ -36,7 +36,7 @@ class RegisteredUsers:
                 return user
 
 
-class AuthToken:
+class AuthTokenManager:
 
     store = []
     def add_user(self, current_user, token):

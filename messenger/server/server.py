@@ -1,4 +1,4 @@
-# tech topics: HTTP (POST request), JSON, ports, python: SimpleHttpServer
+# tech topics: HTTP (POST request), JSON (http request\response body), ports, python: SimpleHttpServer
 
 # server methods:
 # 1) /register - register new user - params: login, password
@@ -14,18 +14,40 @@
 import socketserver
 from http.server import BaseHTTPRequestHandler
 import json
-from messenger.common.user import User, AuthToken, RegisteredUsers, generate_auth_token
+from messenger.common.user import User, AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
 
+# registered_users = []  # TODO store users as User objects with login, password, user_id
+# auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
 
-#registered_users = []  # TODO store users as User objects with login, password, user_id
-#auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
+registered_users = RegisteredUsersManager()
+auth_token_store = AuthTokenManager()
 
-registered_users = RegisteredUsers()
-auth_token_store = AuthToken()
+
+# TODO extract to separate file
+class Response(object):
+    result = "ok"
+
+    def __init__(self, result):
+        self.result = result
+
+
+def toJSON(object):
+    return json.dumps(object, default=lambda obj: obj.__dict__, sort_keys=True, indent=4)
+
+
+class LoginResponse(Response):
+
+    def __init__(self, user_id, auth_token):
+        super().__init__("ok")
+        self.user_id = user_id
+        self.auth_token = auth_token
 
 
 class ServerHandler(BaseHTTPRequestHandler):
+
+    def writeResponse(self, response):
+        self.wfile.write(str.encode(toJSON(response)))
 
     def do_POST(self):
         if self.path == "/register":
@@ -53,21 +75,21 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         # TODO handle other errors: missing password, missing login, etc...
         if len(login) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"login_is_missing\"}"))
+            self.writeResponse(Response("login_is_missing"))
             return
         if registered_users.is_login_in_store(login):
-            self.wfile.write(str.encode("{\"result\" : \"user_already_registered\"}"))
+            self.writeResponse(Response("user_already_registered"))
             return
         if len(password) == 0:
-            self.wfile.write(str.encode("{\"result\" : \"password_is_missing\"}"))
+            self.writeResponse(Response("password_is_missing"))
             return
         if len(password) < 6:
-            self.wfile.write(str.encode("{\"result\" : \"password_must_be_6_or_more_characters_long\"}"))
+            self.writeResponse(Response("password_must_be_6_or_more_characters_long"))
             return
         user = User(login, password)
-        #print('login: {}'.format(user.get_login()))
-        #print('password: {}'.format(user.get_password()))
-        #print('user_id: {}'.format(user.get_id()))
+        # print('login: {}'.format(user.get_login()))
+        # print('password: {}'.format(user.get_password()))
+        # print('user_id: {}'.format(user.get_id()))
         # TODO store users as objects with login, user_id, password etc..
 
         registered_users.add_user(user)
@@ -99,10 +121,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
             auth_token = generate_auth_token()
             auth_token_store.add_user(user, auth_token)
-            self.wfile.write(str.encode(
-                "\"result\" : \"ok\", \"user_id\" : {}, \"auth_token\" : \" {} \"".format(
-                user.get_id(), auth_token
-            )))
+            self.writeResponse(LoginResponse(user.get_id(), auth_token))
             auth_token_store.show_user_tokens()
             return
 
@@ -115,7 +134,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         content_len = int(self.headers.get('Content-Length'))
         post_body = (self.rfile.read(content_len)).decode()
         auth_token = json.loads(post_body)['auth_token']
-        to_user_id = json.loads(post_body)['to_user_id'] # checking have to be done on the client-side? Why not?
+        to_user_id = json.loads(post_body)['to_user_id']  # checking have to be done on the client-side? Why not?
         message = json.loads(post_body)['message']
         if not auth_token_store.is_token_in_store(auth_token):
             self.wfile.write(str.encode(
@@ -131,12 +150,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(str.encode("{\"result\" : \"message_is_missing\"}"))
             return
 
-
         self.wfile.write(str.encode("{\"result\" : \"message_has_delivered\"}"))
-
-
-
-
 
     def handle_read_message(self):
         self.send_response(200)
@@ -147,10 +161,9 @@ class ServerHandler(BaseHTTPRequestHandler):
         since_date = json.loads(post_body)['auth_token']
         message = json.loads(post_body)['message']
 
-
         self.wfile.write(str.encode("{\"result\" : \"not implemented\"}"))
 
-    #setAvatar - set avatar - params: auth_token, avatar_url
+    # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -176,7 +189,6 @@ class ServerHandler(BaseHTTPRequestHandler):
         user.set_avatar(avatar_url)
         self.wfile.write(str.encode("{\"result\" : \"avatar_has_been_set\"}"))
 
-
     # 5) /getUser - get info about user - params: auth_token, user_id
     #             - result: login: String, last_active: Date, avatar_url: String
     def handle_get_user(self):
@@ -201,14 +213,13 @@ class ServerHandler(BaseHTTPRequestHandler):
         last_active = None  # How should it be implemented?
 
         self.wfile.write(str.encode(
-            "\"result\" :\n \"Login: {}\nLast active: {}\nAvatar url: {}\"". format(
+            "\"result\" :\n \"Login: {}\nLast active: {}\nAvatar url: {}\"".format(
                 user.get_login(), last_active, user.get_avatar(),
             )
         ))
 
 
 def run_server():
-
     PORT = 8080
 
     httpd = socketserver.TCPServer(("", PORT), ServerHandler)
