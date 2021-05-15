@@ -9,7 +9,9 @@
 #                  - result: list of Message(message: String, date: Date, from_user_id: Int)
 # 5) /getUser - get info about user - params: auth_token, user_id
 #             - result: login: String, last_active: Date, avatar_url: String
-# 6) /setAvatar - set avatar - params: auth_token, avatar_url
+# 6) /getUserByLogin - get info about user - params: auth_token, login,
+#             - result: login: String, last_active: Date, avatar_url: String, user_id: String
+# 7) /setAvatar - set avatar - params: auth_token, avatar_url
 
 import socketserver
 from http.server import BaseHTTPRequestHandler
@@ -134,7 +136,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         content_len = int(self.headers.get('Content-Length'))
         post_body = (self.rfile.read(content_len)).decode()
         auth_token = json.loads(post_body)['auth_token']
-        to_user_id = json.loads(post_body)['to_user_id']  # checking have to be done on the client-side? Why not?
+        to_user_id = json.loads(post_body)['to_user_id']
         message = json.loads(post_body)['message']
         if not auth_token_store.is_token_in_store(auth_token):
             self.wfile.write(str.encode(
@@ -180,10 +182,10 @@ class ServerHandler(BaseHTTPRequestHandler):
         if len(avatar_url) == 0:
             self.wfile.write(str.encode("{\"result\" : \"url_is_missing\"}"))
             return
-        if not validators.url(avatar_url):  # how to make it work in the right way?
+        if not validators.url(avatar_url):
             self.wfile.write(str.encode("{\"result\" : \"url_is_not_valid\"}"))
             return
-
+        # http request url
         user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
         user = registered_users.get_user_by_id(user_id)
         user.set_avatar(avatar_url)
