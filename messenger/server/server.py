@@ -11,11 +11,10 @@
 #             - result: login: String, last_active: Date, avatar_url: String
 # 6) /setAvatar - set avatar - params: auth_token, avatar_url
 
-import http.server
 import socketserver
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 import json
-from common.user import User, AuthToken, RegisteredUsers, generate_auth_token
+from messenger.common.user import User, AuthToken, RegisteredUsers, generate_auth_token
 import validators
 
 
