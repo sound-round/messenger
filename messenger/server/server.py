@@ -35,7 +35,19 @@ auth_token_store = AuthTokenManager()
 
 #TODO replace self.wfile.write with self.writeResponse(response)
 
-def currentTime():
+class MessagesStore:
+    store = []
+
+
+class Messages:
+
+    def __init__(self, to_user_id, message, date):
+        self.to_user_id = to_user_id
+        self.message = message
+        self.date = date
+
+
+def CurrentTime():
     return int(datetime.datetime.utcnow().timestamp() * 1000)
 
 
@@ -125,7 +137,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         to_user_id = json.loads(post_body)['to_user_id']
-        message = json.loads(post_body)['message']
+        message_next = json.loads(post_body)['message']
         user = auth_token_store.get_user_by_auth_token(auth_token)
         if user is None:
             self.writeResponse(responses.Response("unknown_auth_token"))
@@ -134,10 +146,14 @@ class ServerHandler(BaseHTTPRequestHandler):
         if not registered_users.is_id_in_store(to_user_id):
             self.writeResponse(responses.Response("user_is_missing"))
             return
-        if len(message) == 0:
+        if len(message_next) == 0:
             self.writeResponse(responses.Response("message_is_missing"))
             return
-
+        current_time = CurrentTime()
+        print(current_time)
+        message = Messages(to_user_id, message_next, current_time)
+        messages_store.store.append(message)
+        print(messages_store.store)
         self.writeResponse(responses.Response("message_has_delivered"))
 
     def handle_read_message(self):
@@ -146,17 +162,16 @@ class ServerHandler(BaseHTTPRequestHandler):
         since_date = json.loads(post_body)['since_date']
 
         user = auth_token_store.get_user_by_auth_token(auth_token) # переделать
-        ct = currentTime()
+        current_time = CurrentTime()
 
         if user is not None:
-            user.last_active = ct
+            user.last_active = current_time
+        messages_to_read = []
+        for message in messages_store.store:
+            if message.to_user_id == user.get_id() and message.date >= since_date:
+                messages_to_read.append(message)
 
-        messagesToRead = []
-        for m in messages:
-            if m.to_user_id == user.user_id and m.date >= since_date:
-                messagesToRead.append(m)
-
-        self.writeResponse(responses.ReadMessagesResponse(messagesToRead, ct))
+        self.writeResponse(responses.ReadMessagesResponse(messages_to_read, current_time))
 
     # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):
@@ -196,6 +211,9 @@ class ServerHandler(BaseHTTPRequestHandler):
         self.writeResponse(responses.GetUserResponse(
             user.get_login(), user.get_avatar(), last_active,
         ))
+
+
+messages_store = MessagesStore()
 
 
 def run_server():
