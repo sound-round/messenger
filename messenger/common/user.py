@@ -72,6 +72,7 @@ class AuthTokenManager:
         for user in self.store:
             if auth_token in self.get_user_tokens(user):
                 return user
+        return None
 
     def is_token_in_store(self, auth_token):
         for user in self.store:
