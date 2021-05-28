@@ -80,8 +80,6 @@ class AuthTokenManager:
                 return True
 
 
-
-
 class User:
 
     def __init__(self, login, password):
@@ -113,8 +111,6 @@ class User:
 
     def get_avatar(self):
         return self.avatar_url
-
-
 
 
 def generate_user_id():

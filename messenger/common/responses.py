@@ -1,12 +1,6 @@
-import datetime
-import socketserver
-from http.server import BaseHTTPRequestHandler
 import json
-from messenger.common.user import User, AuthTokenManager, RegisteredUsersManager, generate_auth_token
-import validators
 
 
-# TODO extract to separate file
 class Response(object):
     result = "ok"
 
@@ -40,4 +34,6 @@ class ReadMessagesResponse(Response):
 
 
 def toJSON(object):
-    return json.dumps(object, default=lambda obj: obj.__dict__, sort_keys=True, indent=4)
+    return json.dumps(
+        object, default=lambda obj: obj.__dict__, sort_keys=True, indent=4,
+    )
