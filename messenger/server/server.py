@@ -21,19 +21,21 @@ import datetime
 import socketserver
 from http.server import BaseHTTPRequestHandler
 import json
-from messenger.common.user import User, AuthTokenManager, RegisteredUsersManager, generate_auth_token
+from messenger.common.user import User, \
+    AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
 from messenger.common import responses
 
-# registered_users = []  # TODO store users as User objects with login, password, user_id
-# auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
-messages = [] # TODO replace with some fancy store\manager class
+#  registered_users = []  # TODO store users as User objects with login, password, user_id
+#  auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
+#  messages = [] # TODO replace with some fancy store\manager class
 
 
 registered_users = RegisteredUsersManager()
 auth_token_store = AuthTokenManager()
 
-#TODO replace self.wfile.write with self.writeResponse(response)
+#  TODO replace self.wfile.write with self.writeResponse(response)
+
 
 class MessagesStore:
     store = []
@@ -63,7 +65,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     def writeResponse(self, response):
         self.wfile.write(str.encode(responses.toJSON(response)))
 
-    def do_POST(self):
+    def do_POST(self):  # noqa: C901
         if self.path == "/register":
             self.handle_register()
         if self.path == "/login":
@@ -94,7 +96,9 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.writeResponse(responses.Response("password_is_missing"))
             return
         if len(password) < 6:
-            self.writeResponse(responses.Response("password_must_be_6_or_more_characters_long"))
+            self.writeResponse(responses.Response(
+                "password_must_be_6_or_more_characters_long"
+            ))
             return
         user = User(login, password)
         # print('login: {}'.format(user.get_login()))
@@ -127,7 +131,9 @@ class ServerHandler(BaseHTTPRequestHandler):
 
             auth_token = generate_auth_token()
             auth_token_store.add_user(user, auth_token)
-            self.writeResponse(responses.LoginResponse(user.get_id(), auth_token))
+            self.writeResponse(
+                responses.LoginResponse(user.get_id(), auth_token)
+            )
             auth_token_store.show_user_tokens()
             return
 
@@ -161,17 +167,20 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         since_date = json.loads(post_body)['since_date']
 
-        user = auth_token_store.get_user_by_auth_token(auth_token) # переделать
+        user = auth_token_store.get_user_by_auth_token(auth_token)  # переделать
         current_time = CurrentTime()
 
         if user is not None:
             user.last_active = current_time
         messages_to_read = []
         for message in messages_store.store:
-            if message.to_user_id == user.get_id() and message.date >= since_date:
+            if message.to_user_id == user.get_id() and \
+                    message.date >= since_date:
                 messages_to_read.append(message)
 
-        self.writeResponse(responses.ReadMessagesResponse(messages_to_read, current_time))
+        self.writeResponse(
+            responses.ReadMessagesResponse(messages_to_read, current_time)
+        )
 
     # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):

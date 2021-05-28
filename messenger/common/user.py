@@ -39,6 +39,7 @@ class RegisteredUsersManager:
 class AuthTokenManager:
 
     store = []
+
     def add_user(self, current_user, token):
         user = copy.deepcopy(current_user)
         user.auth_token_store = []
@@ -119,5 +120,3 @@ def generate_user_id():
 
 def generate_auth_token():
     return secrets.token_urlsafe()
-
-
