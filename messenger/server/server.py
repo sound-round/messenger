@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 from messenger.common.user import User, AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
+from messenger.common import responses
 
 # registered_users = []  # TODO store users as User objects with login, password, user_id
 # auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
@@ -37,43 +38,6 @@ auth_token_store = AuthTokenManager()
 def currentTime():
     return int(datetime.datetime.utcnow().timestamp() * 1000)
 
-# TODO extract to separate file
-class Response(object):
-    result = "ok"
-
-    def __init__(self, result):
-        self.result = result
-
-
-def toJSON(object):
-    return json.dumps(object, default=lambda obj: obj.__dict__, sort_keys=True, indent=4)
-
-
-class LoginResponse(Response):
-
-    def __init__(self, user_id, auth_token):
-        super().__init__("ok")
-        self.user_id = user_id
-        self.auth_token = auth_token
-
-
-class GetUser(Response):
-
-    def __init__(self, user_login, avatar, last_active):
-        super().__init__("ok")
-        self.user_login = user_login
-        self.avatar = avatar
-        self.last_active = last_active
-
-
-class ReadMessagesResponse(Response):
-
-    def __init__(self, messages, current_date):
-        super().__init__("ok")
-        self.messages = messages
-        self.current_date = current_date
-
-
 
 class ServerHandler(BaseHTTPRequestHandler):
 
@@ -85,7 +49,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         return (self.rfile.read(content_len)).decode()
 
     def writeResponse(self, response):
-        self.wfile.write(str.encode(toJSON(response)))
+        self.wfile.write(str.encode(responses.toJSON(response)))
 
     def do_POST(self):
         if self.path == "/register":
@@ -109,16 +73,16 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         # TODO handle other errors: missing password, missing login, etc...
         if len(login) == 0:
-            self.writeResponse(Response("login_is_missing"))
+            self.writeResponse(responses.Response("login_is_missing"))
             return
         if registered_users.is_login_in_store(login):
-            self.writeResponse(Response("user_already_registered"))
+            self.writeResponse(responses.Response("user_already_registered"))
             return
         if len(password) == 0:
-            self.writeResponse(Response("password_is_missing"))
+            self.writeResponse(responses.Response("password_is_missing"))
             return
         if len(password) < 6:
-            self.writeResponse(Response("password_must_be_6_or_more_characters_long"))
+            self.writeResponse(responses.Response("password_must_be_6_or_more_characters_long"))
             return
         user = User(login, password)
         # print('login: {}'.format(user.get_login()))
@@ -129,7 +93,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         registered_users.add_user(user)
         registered_users.show_users()
 
-        self.writeResponse(Response(("user_registered")))
+        self.writeResponse(responses.Response(("user_registered")))
 
     def handle_login(self):
         post_body = self.get_post_body()
@@ -138,24 +102,24 @@ class ServerHandler(BaseHTTPRequestHandler):
         # TODO check password
         # TODO handle other errors: missing password, missing login, etc...
         if len(login) == 0:
-            self.writeResponse(Response("login_is_missing"))
+            self.writeResponse(responses.Response("login_is_missing"))
             return
         if len(password) == 0:
-            self.writeResponse(Response("password_is_missing"))
+            self.writeResponse(responses.Response("password_is_missing"))
             return
         if registered_users.is_login_in_store(login):
             user = registered_users.get_user_by_login(login)
             if not user.check_password(password):
-                self.writeResponse(Response("wrong_password"))
+                self.writeResponse(responses.Response("wrong_password"))
                 return
 
             auth_token = generate_auth_token()
             auth_token_store.add_user(user, auth_token)
-            self.writeResponse(LoginResponse(user.get_id(), auth_token))
+            self.writeResponse(responses.LoginResponse(user.get_id(), auth_token))
             auth_token_store.show_user_tokens()
             return
 
-        self.writeResponse(Response("unknown_login"))
+        self.writeResponse(responses.Response("unknown_login"))
 
     def handle_send_message(self):
         post_body = self.get_post_body()
@@ -164,17 +128,17 @@ class ServerHandler(BaseHTTPRequestHandler):
         message = json.loads(post_body)['message']
         user = auth_token_store.get_user_by_auth_token(auth_token)
         if user is None:
-            self.writeResponse(Response("unknown_auth_token"))
+            self.writeResponse(responses.Response("unknown_auth_token"))
             return
 
         if not registered_users.is_id_in_store(to_user_id):
-            self.writeResponse(Response("user_is_missing"))
+            self.writeResponse(responses.Response("user_is_missing"))
             return
         if len(message) == 0:
-            self.writeResponse(Response("message_is_missing"))
+            self.writeResponse(responses.Response("message_is_missing"))
             return
 
-        sself.writeResponse(Response("message_has_delivered"))
+        self.writeResponse(responses.Response("message_has_delivered"))
 
     def handle_read_message(self):
         post_body = self.get_post_body()
@@ -192,7 +156,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             if m.to_user_id == user.user_id and m.date >= since_date:
                 messagesToRead.append(m)
 
-        self.writeResponse(ReadMessagesResponse(messagesToRead, ct))
+        self.writeResponse(responses.ReadMessagesResponse(messagesToRead, ct))
 
     # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):
@@ -200,19 +164,19 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         avatar_url = json.loads(post_body)['avatar_url']
         if not auth_token_store.is_token_in_store(auth_token):
-            self.writeResponse(Response("unknown_auth_token"))
+            self.writeResponse(responses.Response("unknown_auth_token"))
             return
         if len(avatar_url) == 0:
-            self.writeResponse(Response("url_is_missing"))
+            self.writeResponse(responses.Response("url_is_missing"))
             return
         if not validators.url(avatar_url):
-            self.writeResponse(Response("url_is_not_valid"))
+            self.writeResponse(responses.Response("url_is_not_valid"))
             return
         # http request url
         user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
         user = registered_users.get_user_by_id(user_id)
         user.set_avatar(avatar_url)
-        self.writeResponse(Response("avatar_has_been_set"))
+        self.writeResponse(responses.Response("avatar_has_been_set"))
 
     # 5) /getUser - get info about user - params: auth_token, user_id
     #             - result: login: String, last_active: Date, avatar_url: String
@@ -221,16 +185,15 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         user_id_to_get = json.loads(post_body)['user_id_to_get']
         if not auth_token_store.is_token_in_store(auth_token):
-            self.writeResponse(Response("unknown_auth_token"))
+            self.writeResponse(responses.Response("unknown_auth_token"))
             return
         if not registered_users.is_id_in_store(user_id_to_get):
-            self.writeResponse(Response("user_is_missing"))
+            self.writeResponse(responses.Response("user_is_missing"))
             return
         user = registered_users.get_user_by_id(user_id_to_get)
         last_active = None  # How should it be implemented?
 
-# TODO rewrite response under in class
-        self.writeResponse(GetUser(
+        self.writeResponse(responses.GetUserResponse(
             user.get_login(), user.get_avatar(), last_active,
         ))
 
