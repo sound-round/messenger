@@ -41,7 +41,7 @@ class MessagesStore:
     store = []
 
 
-class Messages:
+class Message:
 
     def __init__(self, to_user_id, message, date):
         self.to_user_id = to_user_id
@@ -86,7 +86,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         print(post_body)
 
         # TODO handle other errors: missing password, missing login, etc...
-        if len(login) == 0:
+        if login is None or len(login) == 0:
             self.writeResponse(responses.Response("login_is_missing"))
             return
         if registered_users.is_login_in_store(login):
@@ -157,7 +157,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             return
         current_time = CurrentTime()
         print(current_time)
-        message = Messages(to_user_id, message_next, current_time)
+        message = Message(to_user_id, message_next, current_time)
         messages_store.store.append(message)
         print(messages_store.store)
         self.writeResponse(responses.Response("message_has_delivered"))
