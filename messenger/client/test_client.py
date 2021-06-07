@@ -21,14 +21,20 @@ def callback():
     if mb.askyesno('Verify', 'Really quit?'):
         mb.showwarning('Yes', quit())
 
-def removeAll(f):
+def remove_all(f):
     for widget in f.winfo_children():
         widget.destroy()
+
+def get_quit_button():
+    quit_button = tk.Button(root,
+                       text="QUIT",
+                       command=callback)
+    return quit_button
 
 
 root = tk.Tk()
 root.title("messenger")
-root.geometry('300x100')
+root.geometry('300x130')
 
 
 menu = tk.Menu(root)
@@ -43,66 +49,100 @@ filemenu.add_command(label="Quit", command=callback)
 #TODO refactor, separate UI and Logic and network to multiple files
 #TODO advanced - investigate slow response times (measure and log some basic times)
 
-def displayRegisterUi():
-    print("Do register, todo show login and password")
-    removeAll(root)
-    loginLabel = tk.Label(root, text="Login")
-    loginEntry = tk.Entry(root)
-    passwordLabel = tk.Label(root, text="Password")
-    passwordEntry = tk.Entry(root)
-    resultText = StringVar()
-    resultLabel = tk.Label(root, textvariable=resultText)
-    get_quit_button()
-
+def display_register_ui():
+    #print("Do register, todo show login and password")
+    remove_all(root)
+    login_label = tk.Label(root, text="Login")
+    login_entry = tk.Entry(root)
+    password_label = tk.Label(root, text="Password")
+    password_entry = tk.Entry(root)
+    result_text = StringVar()
+    result_label = tk.Label(root, textvariable=result_text)
 
     def doActualRegister():
-        login = loginEntry.get()
-        password = passwordEntry.get()
-        print("do actual register network request etc..." + login + " " + password)
-        requestJson = json.dumps({'login': login, 'password': password})
-        response = requests.post("http://localhost:8080/register", data=requestJson)
-        responseText = response.text
-        print(responseText)
+        login = login_entry.get()
+        password = password_entry.get()
+        request_output = '\n'.join([
+            "do actual register network request...",
+            f'login: {login}',
+            f'password: {password}',
+        ])
+        print(request_output)
+        request_json = json.dumps({'login': login, 'password': password})
+        response = requests.post("http://localhost:8080/register", data=request_json)
+        response_text = response.text  # How does it work?
+        print(response_text)
 
-        resultText.set("result= " + json.loads(responseText)['result'])
-        #resultLabel.pack(side=BOTTOM)
+        result_text.set(''.join(["result= ", json.loads(response_text)['result']]))
 
-    registerButton = tk.Button(root,
+    register_button = tk.Button(root,
                                text="do Register",
                                command=doActualRegister)
-    loginLabel.grid(row=0,)
-    loginEntry.grid(row=0, column=1)
-    passwordLabel.grid(row=1)
-    passwordEntry.grid(row=1, column=1)
-    registerButton.grid(row=2)
-    resultLabel.grid(row=2, column=1)
+    login_label.grid(row=0,)
+    login_entry.grid(row=0, column=1)
+    password_label.grid(row=1)
+    password_entry.grid(row=1, column=1)
+    register_button.grid(row=2)
+    result_label.grid(row=2, column=1)
+    get_quit_button().grid(row=3)
 
-def login():
-    print("Do login, todo show login and password")
-    removeAll(root)
+
+#def login():
+ #   print("Do login, todo show login and password")
+ #   removeAll(root)
     #TODO implement login button-logic similar to register button
 
 
+def display_login_ui():
+    remove_all(root)
+    login_label = tk.Label(root, text="Login")
+    login_entry = tk.Entry(root)
+    password_label = tk.Label(root, text="Password")
+    password_entry = tk.Entry(root)
+    result_text = StringVar()
+    result_label = tk.Label(root, textvariable=result_text)
+
+    def do_actual_login():
+        login = login_entry.get()
+        password = password_entry.get()
+        request_output = '\n'.join([
+            "do actual login network request...",
+            f'login: {login}',
+            f'password: {password}',
+        ])
+        print(request_output)
+        request_json = json.dumps({'login': login, 'password': password})
+        response = requests.post("http://localhost:8080/login", data=request_json)
+        response_text = response.text
+        print(response_text)
+
+        result_text.set(''.join(["result= ", json.loads(response_text)['result']]))
+
+    login_button = tk.Button(root,
+                               text="do Login",
+                               command=do_actual_login)
+    login_label.grid(row=0,)
+    login_entry.grid(row=0, column=1)
+    password_label.grid(row=1)
+    password_entry.grid(row=1, column=1)
+    login_button.grid(row=2)
+    result_label.grid(row=2, column=1)
+    get_quit_button().grid(row=3)
 
 
-def get_quit_button():
-    quit_button = tk.Button(root,
-                       text="QUIT",
-                       command=callback)
-    return quit_button
 
 
-loginButton = tk.Button(root,
-                        text="Login",
-                        command=login)
+login_button = tk.Button(root,
+                         text="Login",
+                         command=display_login_ui)
 
-registerButton = tk.Button(root,
-                           text="Register",
-                           command=displayRegisterUi)
+register_button = tk.Button(root,
+                            text="Register",
+                            command=display_register_ui)
 
 
-loginButton.grid(row=0, padx=4)
-registerButton.grid(row=0, column=1, pady=10)
+login_button.grid(row=0, padx=4)
+register_button.grid(row=0, column=1, pady=10)
 get_quit_button().grid(row=1)
 
 
