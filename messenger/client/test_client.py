@@ -27,7 +27,9 @@ def removeAll(f):
 
 
 root = tk.Tk()
-#root.title("messenger")
+root.title("messenger")
+root.geometry('300x100')
+
 
 menu = tk.Menu(root)
 root.config(menu=menu)
@@ -35,21 +37,21 @@ filemenu = tk.Menu(menu)
 menu.add_cascade(label="File", menu=filemenu)
 filemenu.add_command(label="Quit", command=callback)
 
-frame = tk.Frame(root)
-frame.pack()
+#frame = tk.Frame(root)
+#frame.pack()
 
 #TODO refactor, separate UI and Logic and network to multiple files
 #TODO advanced - investigate slow response times (measure and log some basic times)
 
 def displayRegisterUi():
     print("Do register, todo show login and password")
-    removeAll(frame)
-    loginLabel = tk.Label(frame, text="Login")
-    loginEntry = tk.Entry(frame)
-    passwordLabel = tk.Label(frame, text="Password")
-    passwordEntry = tk.Entry(frame)
+    removeAll(root)
+    loginLabel = tk.Label(root, text="Login")
+    loginEntry = tk.Entry(root)
+    passwordLabel = tk.Label(root, text="Password")
+    passwordEntry = tk.Entry(root)
     resultText = StringVar()
-    resultLabel = tk.Label(frame, textvariable=resultText)
+    resultLabel = tk.Label(root, textvariable=resultText)
     get_quit_button()
 
 
@@ -63,45 +65,45 @@ def displayRegisterUi():
         print(responseText)
 
         resultText.set("result= " + json.loads(responseText)['result'])
-        resultLabel.pack(side=BOTTOM)
+        #resultLabel.pack(side=BOTTOM)
 
-    registerButton = tk.Button(frame,
+    registerButton = tk.Button(root,
                                text="do Register",
                                command=doActualRegister)
-    loginLabel.pack(side=LEFT)
-    loginEntry.pack(side=LEFT)
-    passwordLabel.pack(side=RIGHT)
-    passwordEntry.pack(side=RIGHT)
-    registerButton.pack(side=BOTTOM)
-    resultLabel.pack(side=BOTTOM)
+    loginLabel.grid(row=0,)
+    loginEntry.grid(row=0, column=1)
+    passwordLabel.grid(row=1)
+    passwordEntry.grid(row=1, column=1)
+    registerButton.grid(row=2)
+    resultLabel.grid(row=2, column=1)
 
 def login():
     print("Do login, todo show login and password")
-    removeAll(frame)
+    removeAll(root)
     #TODO implement login button-logic similar to register button
 
 
 
 
 def get_quit_button():
-    quit_button = tk.Button(frame,
+    quit_button = tk.Button(root,
                        text="QUIT",
                        command=callback)
-    quit_button.pack(side=BOTTOM)
     return quit_button
 
-get_quit_button()
 
-registerButton = tk.Button(frame,
+loginButton = tk.Button(root,
+                        text="Login",
+                        command=login)
+
+registerButton = tk.Button(root,
                            text="Register",
                            command=displayRegisterUi)
 
-registerButton.pack(side=tk.LEFT)
 
-loginButton = tk.Button(frame,
-                        text="Login",
-                        command=login)
-loginButton.pack()
-registerButton.pack(side=tk.LEFT)
+loginButton.grid(row=0, padx=4)
+registerButton.grid(row=0, column=1, pady=10)
+get_quit_button().grid(row=1)
+
 
 root.mainloop()
