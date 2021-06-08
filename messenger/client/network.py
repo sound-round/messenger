@@ -3,8 +3,6 @@ import requests
 import json
 
 
-
-
 # типы клиента
 # 1) Command line client -
 # 2) Desktop ui client - tkinter,
@@ -13,7 +11,7 @@ import json
 
 import tkinter as tk
 from tkinter import LEFT, RIGHT, BOTTOM, StringVar
-from tkinter import messagebox as mb
+
 
 def do_actual_register(login, password):
     request_output = '\n'.join([
@@ -23,7 +21,9 @@ def do_actual_register(login, password):
     ])
     print(request_output)
     request_json = json.dumps({'login': login, 'password': password})
-    response = requests.post("http://localhost:8080/register", data=request_json)
+    response = requests.post(
+        "http://localhost:8080/register", data=request_json
+    )
     response_text = response.text  # How does it work?
     print(response_text)
     return response_text
