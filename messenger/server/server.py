@@ -17,6 +17,10 @@
 # Data types:
 # Date - unix time in milliseconds integer
 
+#TODO high priority: use sqlite for storage on both server and client
+#TODO add expiring for auth_token
+#TODO low priority: create html+javascript (webstorm ide) client?
+
 import datetime
 import socketserver
 from http.server import BaseHTTPRequestHandler
@@ -34,7 +38,7 @@ from messenger.common import responses
 registered_users = RegisteredUsersManager()
 auth_token_store = AuthTokenManager()
 
-#  TODO replace self.wfile.write with self.writeResponse(response)
+
 
 
 class MessagesStore:
@@ -42,14 +46,15 @@ class MessagesStore:
 
 
 class Message:
-
+    #TODO add from_user_id
+    #TODO move to common
     def __init__(self, to_user_id, message, date):
         self.to_user_id = to_user_id
         self.message = message
         self.date = date
 
 
-def CurrentTime():
+def current_time():
     return int(datetime.datetime.utcnow().timestamp() * 1000)
 
 
@@ -72,7 +77,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.handle_login()
         if self.path == "/sendMessage":
             self.handle_send_message()
-        if self.path == "/readMessage":
+        if self.path == "/readMessages":
             self.handle_read_message()
         if self.path == "/getUser":
             self.handle_get_user()
@@ -80,11 +85,12 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.handle_set_avatar()
 
     def handle_register(self):
+        print(f'register handle beginning: {current_time()}')
         post_body = self.get_post_body()
         login = json.loads(post_body).get('login')
         password = json.loads(post_body).get('password')
         print(post_body)
-
+        print(f'register post body formed: {current_time()}')
         # TODO handle other errors: missing password, missing login, etc...
         if login is None or len(login) == 0:
             self.writeResponse(responses.Response("login_is_missing"))
@@ -100,14 +106,17 @@ class ServerHandler(BaseHTTPRequestHandler):
                 "password_must_be_6_or_more_characters_long"
             ))
             return
+        print(f'register check ended: {current_time()}')
         user = User(login, password)
         # print('login: {}'.format(user.get_login()))
         # print('password: {}'.format(user.get_password()))
         # print('user_id: {}'.format(user.get_id()))
         # TODO store users as objects with login, user_id, password etc..
-
+        print(f'register user add begin: {current_time()}')
         registered_users.add_user(user)
+        print(f'register user add and: {current_time()}')
         registered_users.show_users()
+        print(f'register show user end: {current_time()}')
 
         self.writeResponse(responses.Response(("user_registered")))
 
@@ -155,9 +164,9 @@ class ServerHandler(BaseHTTPRequestHandler):
         if len(message_next) == 0:
             self.writeResponse(responses.Response("message_is_missing"))
             return
-        current_time = CurrentTime()
-        print(current_time)
-        message = Message(to_user_id, message_next, current_time)
+        date = current_time()
+        print(date)
+        message = Message(to_user_id, message_next, date)
         messages_store.store.append(message)
         print(messages_store.store)
         self.writeResponse(responses.Response("message_has_delivered"))
@@ -168,10 +177,10 @@ class ServerHandler(BaseHTTPRequestHandler):
         since_date = json.loads(post_body)['since_date']
 
         user = auth_token_store.get_user_by_auth_token(auth_token)  # переделать
-        current_time = CurrentTime()
+        var_current_time = current_time()
 
         if user is not None:
-            user.last_active = current_time
+            user.last_active = var_current_time
         messages_to_read = []
         for message in messages_store.store:
             if message.to_user_id == user.get_id() and \
@@ -179,7 +188,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 messages_to_read.append(message)
 
         self.writeResponse(
-            responses.ReadMessagesResponse(messages_to_read, current_time)
+            responses.ReadMessagesResponse(messages_to_read, var_current_time)
         )
 
     # setAvatar - set avatar - params: auth_token, avatar_url

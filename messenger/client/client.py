@@ -2,7 +2,7 @@ import requests
 import json
 from messenger.client import network
 
-# contents = urllib.request.urlopen("http://localhost:8080/register").read()
+# contents = urllib.request.urlopen("http://127.0.0.1:8080/register").read()
 
 # print(contents)
 
@@ -16,6 +16,19 @@ from messenger.client import network
 import tkinter as tk
 from tkinter import LEFT, RIGHT, BOTTOM, StringVar
 from tkinter import messagebox as mb
+
+
+#TODO rename file to Client.py
+class Chat:
+    def __init__(self):
+        pass
+    
+chats = [] # TODO class Chat(to_user_id, messages: Message[])
+
+def getUsername(user_id):
+    #TODO actual find
+    return "Test"
+
 
 
 def main():
@@ -54,6 +67,51 @@ def main():
     # TODO refactor, separate UI and Logic and network to multiple files
     # TODO advanced - investigate slow response times (measure and log some basic times)
 
+    def display_chats_ui():
+        remove_all(root)
+        
+        run_update_loop()
+        login_label = tk.Label(root, text="Chats")
+
+        start_chat = tk.Button(root, text="Start chat")
+        #TODO open dialog with Login input -
+        # находит юзера по логину
+        # или показывает ошибку
+        # если нашло тогда показывает UI чата, где видны сообщения и можно отправить новое сообщение
+
+        login_label.place(x=10, y=0, width=100, height=20)
+        start_chat.place(x=10, y=25, width=100, height=20)
+
+        def populate_chats(frame):
+            row = 0
+            for chat in chats:
+                tk.Label(frame, text=getUsername(chat.to_user_id)).grid(row=row, column=0)
+                lastMessageText = chat.messages[-1].message
+                tk.Label(frame, text=lastMessageText).grid(row=row + 1, column=0)
+                #TODO draw thin line separator
+                tk.Label(frame, text="----------").grid(row=row + 2, column=0)
+                row = row + 3
+
+        def onFrameConfigure(canvas):
+            '''Reset the scroll region to encompass the inner frame'''
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        #TODO resize root window
+        canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
+        frame = tk.Frame(canvas, background="#ffffff")
+        scrollBar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollBar.set)
+
+        scrollBar.place(x=300, y=45, width=20, height=480)
+        canvas.place(x=0, y=45, width=300, height=480)
+        canvas.create_window((4, 4), window=frame, anchor="nw")
+
+        frame.bind("<Configure>", lambda event, canvas=canvas: onFrameConfigure(canvas))
+
+        populate_chats(frame)
+
+
+
     def display_register_ui():
         remove_all(root)
         login_label = tk.Label(root, text="Login")
@@ -67,11 +125,12 @@ def main():
         def register():
             login = login_entry.get()
             password = password_entry.get()
-            response_text = network.do_actual_register(
+
+            response = network.register(
                 login, password
             )
             result_text.set(
-                ''.join(["result= ", json.loads(response_text)['result']])
+                ''.join(["result= ", response['result']])
             )
 
         register_button = tk.Button(root,
@@ -102,12 +161,13 @@ def main():
         def login():
             login = login_entry.get()
             password = password_entry.get()
-            response_text = network.do_actual_login(
+            response = network.do_actual_login(
                 login, password
             )
             result_text.set(
-                ''.join(["result= ", json.loads(response_text)['result']])
+                ''.join(["result= ", response['result']])
             )
+            display_chats_ui()
 
         login_button = tk.Button(root,
                                  text="do Login",
@@ -137,9 +197,14 @@ def main():
         register_button.grid(row=0, column=1, pady=10)
         get_quit_button().grid(row=1)
 
+    def run_update_loop():
+        print("TODO call server readMessages")
+        network.readMessages()
+        root.after(3000, run_update_loop)
+
     root = tk.Tk()
     root.title("messenger")
-    root.geometry('300x150')
+    root.geometry('320x568')
 
     display_mainmenu()
 

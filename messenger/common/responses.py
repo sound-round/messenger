@@ -30,7 +30,7 @@ class ReadMessagesResponse(Response):
     def __init__(self, messages, current_time):
         super().__init__("ok")
         self.messages = messages
-        self.current_date = current_time
+        self.current_time = current_time
 
 
 def toJSON(object):
