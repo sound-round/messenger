@@ -122,7 +122,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(
                 responses.LoginResponse(user.get_id(), auth_token)
             )
-            auth_token_store.show_user_tokens()
+            #auth_token_store.show_user_tokens()
             return
 
         self.write_response(responses.Response("unknown_login"))
