@@ -25,33 +25,16 @@ import datetime
 import socketserver
 from http.server import BaseHTTPRequestHandler
 import json
+
+from messenger.common.messages import MessagesStore, Message
 from messenger.common.user import User, \
     AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
 from messenger.common import responses
 
-#  registered_users = []  # TODO store users as User objects with login, password, user_id
-#  auth_token_store = []        # TODO store user's auth_token_store as objects with user_id, auth_token_store {user_id = 10, auth_token_store="fhhhdas123"}
-#  messages = [] # TODO replace with some fancy store\manager class
-
 
 registered_users = RegisteredUsersManager()
 auth_token_store = AuthTokenManager()
-
-
-
-
-class MessagesStore:
-    store = []
-
-
-class Message:
-    #TODO add from_user_id
-    #TODO move to common
-    def __init__(self, to_user_id, message, date):
-        self.to_user_id = to_user_id
-        self.message = message
-        self.date = date
 
 
 def current_time():
@@ -67,7 +50,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         content_len = int(self.headers.get('Content-Length'))
         return (self.rfile.read(content_len)).decode()
 
-    def writeResponse(self, response):
+    def write_response(self, response):
         self.wfile.write(str.encode(responses.toJSON(response)))
 
     def do_POST(self):  # noqa: C901
@@ -91,18 +74,17 @@ class ServerHandler(BaseHTTPRequestHandler):
         password = json.loads(post_body).get('password')
         print(post_body)
         print(f'register post body formed: {current_time()}')
-        # TODO handle other errors: missing password, missing login, etc...
         if login is None or len(login) == 0:
-            self.writeResponse(responses.Response("login_is_missing"))
+            self.write_response(responses.Response("login_is_missing"))
             return
         if registered_users.is_login_in_store(login):
-            self.writeResponse(responses.Response("user_already_registered"))
+            self.write_response(responses.Response("user_already_registered"))
             return
         if len(password) == 0:
-            self.writeResponse(responses.Response("password_is_missing"))
+            self.write_response(responses.Response("password_is_missing"))
             return
         if len(password) < 6:
-            self.writeResponse(responses.Response(
+            self.write_response(responses.Response(
                 "password_must_be_6_or_more_characters_long"
             ))
             return
@@ -111,65 +93,64 @@ class ServerHandler(BaseHTTPRequestHandler):
         # print('login: {}'.format(user.get_login()))
         # print('password: {}'.format(user.get_password()))
         # print('user_id: {}'.format(user.get_id()))
-        # TODO store users as objects with login, user_id, password etc..
         print(f'register user add begin: {current_time()}')
         registered_users.add_user(user)
         print(f'register user add and: {current_time()}')
         registered_users.show_users()
         print(f'register show user end: {current_time()}')
 
-        self.writeResponse(responses.Response(("user_registered")))
+        self.write_response(responses.Response(("user_registered")))
 
     def handle_login(self):
         post_body = self.get_post_body()
         login = json.loads(post_body)['login']
         password = json.loads(post_body)['password']
-        # TODO check password
-        # TODO handle other errors: missing password, missing login, etc...
         if len(login) == 0:
-            self.writeResponse(responses.Response("login_is_missing"))
+            self.write_response(responses.Response("login_is_missing"))
             return
         if len(password) == 0:
-            self.writeResponse(responses.Response("password_is_missing"))
+            self.write_response(responses.Response("password_is_missing"))
             return
         if registered_users.is_login_in_store(login):
             user = registered_users.get_user_by_login(login)
             if not user.check_password(password):
-                self.writeResponse(responses.Response("wrong_password"))
+                self.write_response(responses.Response("wrong_password"))
                 return
 
             auth_token = generate_auth_token()
             auth_token_store.add_user(user, auth_token)
-            self.writeResponse(
+            self.write_response(
                 responses.LoginResponse(user.get_id(), auth_token)
             )
             auth_token_store.show_user_tokens()
             return
 
-        self.writeResponse(responses.Response("unknown_login"))
+        self.write_response(responses.Response("unknown_login"))
 
     def handle_send_message(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
+        #from_user_id = json.loads(post_body)['from_user_id'] # is it right? Or it should be found in user_store?
         to_user_id = json.loads(post_body)['to_user_id']
-        message_next = json.loads(post_body)['message']
-        user = auth_token_store.get_user_by_auth_token(auth_token)
-        if user is None:
-            self.writeResponse(responses.Response("unknown_auth_token"))
+        message_text = json.loads(post_body)['message']
+        from_user = auth_token_store.get_user_by_auth_token(auth_token)
+        from_user_id = from_user.get_id()
+        if from_user is None:
+            self.write_response(responses.Response("unknown_auth_token"))
             return
 
         if not registered_users.is_id_in_store(to_user_id):
-            self.writeResponse(responses.Response("user_is_missing"))
+            self.write_response(responses.Response("user_is_missing"))
             return
-        if len(message_next) == 0:
-            self.writeResponse(responses.Response("message_is_missing"))
+        if len(message_text) == 0:
+            self.write_response(responses.Response("message_is_missing"))
             return
         date = current_time()
         print(date)
-        message = Message(to_user_id, message_next, date)
+        message = Message(from_user_id, to_user_id, message_text, date)
         messages_store.store.append(message)
         print(messages_store.store)
-        self.writeResponse(responses.Response("message_has_delivered"))
+        self.write_response(responses.Response("message_has_delivered"))
 
     def handle_read_message(self):
         post_body = self.get_post_body()
@@ -187,7 +168,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                     message.date >= since_date:
                 messages_to_read.append(message)
 
-        self.writeResponse(
+        self.write_response(
             responses.ReadMessagesResponse(messages_to_read, var_current_time)
         )
 
@@ -197,19 +178,19 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         avatar_url = json.loads(post_body)['avatar_url']
         if not auth_token_store.is_token_in_store(auth_token):
-            self.writeResponse(responses.Response("unknown_auth_token"))
+            self.write_response(responses.Response("unknown_auth_token"))
             return
         if len(avatar_url) == 0:
-            self.writeResponse(responses.Response("url_is_missing"))
+            self.write_response(responses.Response("url_is_missing"))
             return
         if not validators.url(avatar_url):
-            self.writeResponse(responses.Response("url_is_not_valid"))
+            self.write_response(responses.Response("url_is_not_valid"))
             return
         # http request url
         user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
         user = registered_users.get_user_by_id(user_id)
         user.set_avatar(avatar_url)
-        self.writeResponse(responses.Response("avatar_has_been_set"))
+        self.write_response(responses.Response("avatar_has_been_set"))
 
     # 5) /getUser - get info about user - params: auth_token, user_id
     #             - result: login: String, last_active: Date, avatar_url: String
@@ -218,15 +199,15 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         user_id_to_get = json.loads(post_body)['user_id_to_get']
         if not auth_token_store.is_token_in_store(auth_token):
-            self.writeResponse(responses.Response("unknown_auth_token"))
+            self.write_response(responses.Response("unknown_auth_token"))
             return
         if not registered_users.is_id_in_store(user_id_to_get):
-            self.writeResponse(responses.Response("user_is_missing"))
+            self.write_response(responses.Response("user_is_missing"))
             return
         user = registered_users.get_user_by_id(user_id_to_get)
         last_active = None  # How should it be implemented?
 
-        self.writeResponse(responses.GetUserResponse(
+        self.write_response(responses.GetUserResponse(
             user.get_login(), user.get_avatar(), last_active,
         ))
 
