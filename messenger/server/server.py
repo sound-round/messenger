@@ -21,12 +21,15 @@
 #TODO add expiring for auth_token
 #TODO low priority: create html+javascript (webstorm ide) client?
 
+#TODO избегать падений сервера, в случае ошибки обработки запроса - возвращать джсон с резалт = "internal server error"
+
+
 import datetime
 import socketserver
 from http.server import BaseHTTPRequestHandler
 import json
 
-from messenger.common.messages import MessagesStore, Message
+from messenger.common.messages import Message
 from messenger.common.user import User, \
     AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
@@ -160,8 +163,13 @@ class ServerHandler(BaseHTTPRequestHandler):
         user = auth_token_store.get_user_by_auth_token(auth_token)  # переделать
         var_current_time = current_time()
 
+        if user is None:
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
+
         if user is not None:
             user.last_active = var_current_time
+        print("handle_read_message user=" + str(user))
         messages_to_read = []
         for message in messages_store.store:
             if message.to_user_id == user.get_id() and \
@@ -192,8 +200,6 @@ class ServerHandler(BaseHTTPRequestHandler):
         user.set_avatar(avatar_url)
         self.write_response(responses.Response("avatar_has_been_set"))
 
-    # 5) /getUser - get info about user - params: auth_token, user_id
-    #             - result: login: String, last_active: Date, avatar_url: String
     def handle_get_user(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
@@ -210,6 +216,10 @@ class ServerHandler(BaseHTTPRequestHandler):
         self.write_response(responses.GetUserResponse(
             user.get_login(), user.get_avatar(), last_active,
         ))
+
+
+class MessagesStore:
+    store = []
 
 
 messages_store = MessagesStore()

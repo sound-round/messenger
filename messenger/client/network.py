@@ -1,22 +1,13 @@
-
 import requests
 import json
 from messenger.server.server import current_time
 
 
-# типы клиента
-# 1) Command line client -
-# 2) Desktop ui client - tkinter,
-# 3) web client - some python web libraries?
-
-
-import tkinter as tk
-from tkinter import LEFT, RIGHT, BOTTOM, StringVar
-
-
-
 global_auth_token = ""
 global_since_date = 0
+global_user_id = ""
+
+#TODO в случае ошибки соединения и парсинга данных - писать в лог сообщение и не падать программой
 
 def register(login, password):
 
@@ -39,7 +30,7 @@ def register(login, password):
 
 
 def do_actual_login(login, password):
-    global global_auth_token
+    global global_auth_token, global_user_id
     request_output = '\n'.join([
         "do actual login network request...",
         f'login: {login}',
@@ -47,19 +38,25 @@ def do_actual_login(login, password):
     ])
     print(request_output)
     request_json = json.dumps({'login': login, 'password': password})
-    response = requests.post("http://127.0.0.1:8080/login", data=request_json)
+    response = requests.post(
+        "http://127.0.0.1:8080/login", data=request_json
+    )
     response_text = response.text
-    print(response_text)
+    print(f'response text: {response_text}')
     response = json.loads(response_text)
     global_auth_token = response["auth_token"]
+    global_user_id = response["user_id"]
     return response
 
 
-
-
-def readMessages():
+def read_messages():
     global global_auth_token, global_since_date
-    request_json = json.dumps({'auth_token': global_auth_token, 'since_date': global_since_date})
+    request_json = json.dumps(
+        {
+            'auth_token': global_auth_token,
+            'since_date': global_since_date
+        }
+    )
     print("request= "+ request_json)
     response = requests.post("http://127.0.0.1:8080/readMessages", data=request_json)
     response_text = response.text
