@@ -29,7 +29,7 @@ import socketserver
 from http.server import BaseHTTPRequestHandler
 import json
 
-from messenger.common.messages import Message
+from messenger.server.messages import Message
 from messenger.common.user import User, \
     AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
@@ -93,9 +93,6 @@ class ServerHandler(BaseHTTPRequestHandler):
             return
         print(f'register check ended: {current_time()}')
         user = User(login, password)
-        # print('login: {}'.format(user.get_login()))
-        # print('password: {}'.format(user.get_password()))
-        # print('user_id: {}'.format(user.get_id()))
         print(f'register user add begin: {current_time()}')
         registered_users.add_user(user)
         print(f'register user add and: {current_time()}')

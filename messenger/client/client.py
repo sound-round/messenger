@@ -15,8 +15,7 @@ import tkinter as tk
 from tkinter import StringVar
 from tkinter import messagebox as mb
 
-from messenger.client.network import global_user_id
-from messenger.common.messages import Message
+from messenger.server.messages import Message
 
 from messenger.client.network import global_user_id
 
