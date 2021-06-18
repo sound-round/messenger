@@ -1,6 +1,7 @@
 import requests
 import json
 from messenger.server.server import current_time
+from requests.exceptions import ConnectionError
 
 
 global_auth_token = ""
@@ -17,15 +18,22 @@ def register(login, password):
         f'password: {password}',
     ])
     print(request_output)
-    startTs = current_time()
-    print(f'register beginning: {startTs}')
     request_json = json.dumps({'login': login, 'password': password})
-    response = requests.post(
-        "http://127.0.0.1:8080/register", data=request_json
-    )
-    print(f'register ending: {current_time() - startTs}')
-    response_text = response.text  # How does it work?
-    print(response_text)
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8080/register", data=request_json
+        )
+    except ConnectionError as e:
+        print(e)
+    else:
+        response_text = response.text  # How does it work?
+        print(f"response text: {response_text}")
+        return json.loads(response_text)
+
+    response_text = '''{
+        "result": "internal_server_error"
+    }'''
+    print(f"response text: {response_text}")
     return json.loads(response_text)
 
 
@@ -38,15 +46,24 @@ def do_actual_login(login, password):
     ])
     print(request_output)
     request_json = json.dumps({'login': login, 'password': password})
-    response = requests.post(
-        "http://127.0.0.1:8080/login", data=request_json
-    )
-    response_text = response.text
-    print(f'response text: {response_text}')
-    response = json.loads(response_text)
-    global_auth_token = response["auth_token"]
-    global_user_id = response["user_id"]
-    return response
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8080/login", data=request_json
+        )
+    except ConnectionError as e:
+        print(e)
+    else:
+        response_text = response.text
+        print(f'response text: {response_text}')
+        response = json.loads(response_text)
+        global_auth_token = response.get("auth_token")
+        global_user_id = response.get("user_id")
+        return response
+
+    response_text = '''{
+           "result": "internal_server_error"
+       }'''
+    return json.loads(response_text)
 
 
 def read_messages():
@@ -57,8 +74,10 @@ def read_messages():
             'since_date': global_since_date
         }
     )
-    print("request= "+ request_json)
-    response = requests.post("http://127.0.0.1:8080/readMessages", data=request_json)
+    print("request= " + request_json)
+    response = requests.post(
+        "http://127.0.0.1:8080/readMessages", data=request_json
+    )
     response_text = response.text
     print("response= " + response_text)
     response = json.loads(response_text)

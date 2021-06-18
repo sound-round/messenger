@@ -32,7 +32,7 @@ class Chat:
         self.messages.append(message)
 
 
-class ChatManager:  #TODO move to client
+class ChatManager:
     store = []
 
     def add_message(self, message):
@@ -188,6 +188,8 @@ def main():
             result_text.set(
                 ''.join(["result= ", response['result']])
             )
+            if response['result'] != "ok":
+                return
             display_chats_ui()
 
         login_button = tk.Button(root,

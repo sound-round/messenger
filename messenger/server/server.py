@@ -99,7 +99,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         registered_users.show_users()
         print(f'register show user end: {current_time()}')
 
-        self.write_response(responses.Response(("user_registered")))
+        self.write_response(responses.Response("user_registered"))
 
     def handle_login(self):
         post_body = self.get_post_body()
@@ -122,7 +122,6 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(
                 responses.LoginResponse(user.get_id(), auth_token)
             )
-            #auth_token_store.show_user_tokens()
             return
 
         self.write_response(responses.Response("unknown_login"))
