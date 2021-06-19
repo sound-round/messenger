@@ -12,6 +12,7 @@ from messenger.client import network
 
 
 import tkinter as tk
+from tkinter import ttk
 from tkinter import StringVar
 from tkinter import messagebox as mb
 
@@ -40,6 +41,7 @@ class ChatManager:
                 print("add message to existing chat " + str(chat.__dict__))
                 return
         self.store.append(Chat(with_user_id, message))
+
 
 chat_manager = ChatManager()
 
@@ -84,6 +86,7 @@ def main():
         login_label = tk.Label(root, text="ChatManager")
 
         start_chat = tk.Button(root, text="Start chat")
+        back_button = get_back_button()
         #TODO open dialog with Login input -
         # находит юзера по логину
         # или показывает ошибку
@@ -91,6 +94,8 @@ def main():
 
         login_label.place(x=10, y=0, width=100, height=20)
         start_chat.place(x=10, y=25, width=100, height=20)
+        back_button.place(x=10, y=528, width=100, height=30)
+
 
         def populate_chats(frame):
             if not frame.winfo_exists():
@@ -103,6 +108,8 @@ def main():
                 tk.Label(frame, text=last_message_text).grid(row=row + 1, column=0)
                 #TODO draw thin line separator
                 tk.Label(frame, text="----------").grid(row=row + 2, column=0)
+                #separator = ttk.Separator(frame, orient='horizontal')
+                #separator.pack(fill='x')
                 row = row + 3
 
             root.after(3000, populate_chats, frame)
@@ -218,7 +225,6 @@ def main():
         print("TODO call server readMessages")
         response = network.read_messages()
         for message in response["messages"]:
-            # TODO remove new_message?
             new_message = Message(message["from_user_id"], global_user_id, message["message"], message["date"])
             chat_manager.add_message(new_message)
             print("got new message " + str(new_message.__dict__))
