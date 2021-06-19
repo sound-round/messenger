@@ -65,6 +65,8 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.handle_read_message()
         if self.path == "/getUser":
             self.handle_get_user()
+        if self.path == "/findUserId":
+            self.handle_find_user_id()
         if self.path == "/setAvatar":
             self.handle_set_avatar()
 
@@ -205,6 +207,22 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         self.write_response(responses.GetUserResponse(
             user.get_login(), user.get_avatar(), last_active,
+        ))
+
+    def handle_find_user_id(self):
+        post_body = self.get_post_body()
+        auth_token = json.loads(post_body)['auth_token']
+        login = json.loads(post_body)['user_login_to_get']
+        if not auth_token_store.is_token_in_store(auth_token):
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
+        if not registered_users.is_login_in_store(login):
+            self.write_response(responses.Response("user_is_missing"))
+            return
+        user = registered_users.get_user_by_login(login)
+
+        self.write_response(responses.FindUserIDResponse(
+            user.get_id(),
         ))
 
 

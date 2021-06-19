@@ -85,7 +85,6 @@ def read_messages():
 
 
 def get_username(user_id):
-    # TODO this in network
     global global_auth_token
     request_json = json.dumps(
         {
@@ -99,3 +98,20 @@ def get_username(user_id):
     response_text = response.text
     response = json.loads(response_text)
     return response['login']
+
+
+def find_user_id(login):
+    global global_auth_token
+    request_json = json.dumps(
+        {
+            'auth_token': global_auth_token,
+            'user_login_to_get': login
+        }
+    )
+    response = requests.post(
+        "http://127.0.0.1:8080/findUserId", data=request_json
+    )
+    response_text = response.text
+    response = json.loads(response_text)
+    print(response_text)
+    return response

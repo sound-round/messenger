@@ -12,7 +12,7 @@ from messenger.client import network
 
 
 import tkinter as tk
-from tkinter import ttk
+#from tkinter import ttk
 from tkinter import StringVar
 from tkinter import messagebox as mb
 
@@ -41,6 +41,11 @@ class ChatManager:
                 print("add message to existing chat " + str(chat.__dict__))
                 return
         self.store.append(Chat(with_user_id, message))
+
+    def get_chat(self, with_user_id):
+        for chat in self.store:
+            if chat.with_user_id == with_user_id:
+                return chat
 
 
 chat_manager = ChatManager()
@@ -80,21 +85,64 @@ def main():
 
 
     def display_chats_ui():
+
+        def open_dialog():
+            login = entry.get()
+            if not login:
+                result_text.set(
+                    'login_is_missing'
+                )
+                return
+            response = network.find_user_id(login)
+            result_text.set(
+                ''.join(["result= ", response['result']])
+            )
+            if response['result'] != "ok":
+                return
+            with_user_id = response['user_id']
+            chat = chat_manager.get_chat(with_user_id)
+
+            remove_all(root)
+
+            #run_chat_update_loop() #TODO this function
+            dialog_label = tk.Label(root, text=f"Chat with {login}")
+            dialog_label.place(x=10, y=0, width=100, height=20)
+
+            chat_canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
+            chat_frame = tk.Frame(chat_canvas, background="#ffffff")
+            chat_scroll_bar = tk.Scrollbar(root, orient="vertical", command=chat_canvas.yview)
+            chat_canvas.configure(yscrollcommand=chat_scroll_bar.set)
+
+            chat_scroll_bar.place(x=300, y=70, width=20, height=455)
+            chat_canvas.place(x=0, y=70, width=300, height=455)
+            chat_canvas.create_window((4, 4), window=chat_frame, anchor="nw")
+
+            chat_frame.bind("<Configure>", lambda event, canvas=chat_canvas: on_frame_configure(chat_canvas))
+
         remove_all(root)
         
         run_update_loop()
-        login_label = tk.Label(root, text="ChatManager")
-
-        start_chat = tk.Button(root, text="Start chat")
+        chat_label = tk.Label(root, text="ChatManager")
+        login_label = tk.Label(root, text="Enter user login: ")
+        start_chat = tk.Button(root, text="Start chat", command=open_dialog)
         back_button = get_back_button()
+
+
         #TODO open dialog with Login input -
         # находит юзера по логину
         # или показывает ошибку
         # если нашло тогда показывает UI чата, где видны сообщения и можно отправить новое сообщение
 
-        login_label.place(x=10, y=0, width=100, height=20)
-        start_chat.place(x=10, y=25, width=100, height=20)
+        chat_label.place(x=10, y=0, width=100, height=20)
+        login_label.place(x=10, y=25, width=120, height=20)
+        start_chat.place(x=10, y=50, width=100, height=20)
         back_button.place(x=10, y=528, width=100, height=30)
+
+        entry = tk.Entry()
+        entry.place(x=130, y=25)
+        result_text = StringVar()
+        result_label = tk.Label(root, textvariable=result_text)
+        result_label.place(x=130, y=50, width=160, height=20)
 
 
         def populate_chats(frame):
@@ -124,8 +172,8 @@ def main():
         scroll_bar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scroll_bar.set)
 
-        scroll_bar.place(x=300, y=45, width=20, height=480)
-        canvas.place(x=0, y=45, width=300, height=480)
+        scroll_bar.place(x=300, y=70, width=20, height=455)
+        canvas.place(x=0, y=70, width=300, height=455)
         canvas.create_window((4, 4), window=frame, anchor="nw")
 
         frame.bind("<Configure>", lambda event, canvas=canvas: on_frame_configure(canvas))

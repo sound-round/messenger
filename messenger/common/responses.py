@@ -25,6 +25,13 @@ class GetUserResponse(Response):
         self.last_active = last_active
 
 
+class FindUserIDResponse(Response):
+
+    def __init__(self, user_id):
+        super().__init__("ok")
+        self.user_id = user_id
+
+
 class ReadMessagesResponse(Response):
 
     def __init__(self, messages, current_time):
