@@ -8,7 +8,6 @@ global_auth_token = ""
 global_since_date = 0
 global_user_id = ""
 
-#TODO в случае ошибки соединения и парсинга данных - писать в лог сообщение и не падать программой
 
 def register(login, password):
 
@@ -83,3 +82,20 @@ def read_messages():
     response = json.loads(response_text)
     global_since_date = response["current_time"]
     return response
+
+
+def get_username(user_id):
+    # TODO this in network
+    global global_auth_token
+    request_json = json.dumps(
+        {
+            'auth_token': global_auth_token,
+            'user_id_to_get': user_id
+        }
+    )
+    response = requests.post(
+        "http://127.0.0.1:8080/getUser", data=request_json
+    )
+    response_text = response.text
+    response = json.loads(response_text)
+    return response['login']

@@ -21,8 +21,6 @@
 #TODO add expiring for auth_token
 #TODO low priority: create html+javascript (webstorm ide) client?
 
-#TODO избегать падений сервера, в случае ошибки обработки запроса - возвращать джсон с резалт = "internal server error"
-
 
 import datetime
 import socketserver
@@ -91,13 +89,9 @@ class ServerHandler(BaseHTTPRequestHandler):
                 "password_must_be_6_or_more_characters_long"
             ))
             return
-        print(f'register check ended: {current_time()}')
         user = User(login, password)
-        print(f'register user add begin: {current_time()}')
         registered_users.add_user(user)
-        print(f'register user add and: {current_time()}')
-        registered_users.show_users()
-        print(f'register show user end: {current_time()}')
+        #registered_users.show_users()
 
         self.write_response(responses.Response("user_registered"))
 
@@ -163,8 +157,8 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("unknown_auth_token"))
             return
 
-        if user is not None:
-            user.last_active = var_current_time
+        #if user is not None:
+        user.last_active = var_current_time
         print("handle_read_message user=" + str(user))
         messages_to_read = []
         for message in messages_store.store:

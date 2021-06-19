@@ -41,6 +41,10 @@ class AuthTokenManager:
     store = []
 
     def add_user(self, current_user, token):
+        for user in self.store:
+            if user.get_id() == current_user.get_id():
+                user.auth_token_store.append(token)
+                return
         user = copy.deepcopy(current_user)
         user.auth_token_store = []
         user.auth_token_store.append(token)

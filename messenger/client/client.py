@@ -15,11 +15,8 @@ import tkinter as tk
 from tkinter import StringVar
 from tkinter import messagebox as mb
 
+from messenger.client.network import global_user_id, get_username
 from messenger.server.messages import Message
-
-from messenger.client.network import global_user_id
-
-
 
 
 # TODO class Chat(to_user_id, messages: Message[])
@@ -44,11 +41,7 @@ class ChatManager:
                 return
         self.store.append(Chat(with_user_id, message))
 
-def get_username(user_id):
-    # TODO this in network
-    return "Test"
-
-chatManager = ChatManager()
+chat_manager = ChatManager()
 
 def main():
 
@@ -104,7 +97,7 @@ def main():
                 return
             remove_all(frame)
             row = 0
-            for chat in chatManager.store:
+            for chat in chat_manager.store:
                 tk.Label(frame, text=get_username(chat.with_user_id)).grid(row=row, column=0)
                 last_message_text = chat.messages[-1].message
                 tk.Label(frame, text=last_message_text).grid(row=row + 1, column=0)
@@ -154,6 +147,7 @@ def main():
             result_text.set(
                 ''.join(["result= ", response['result']])
             )
+
 
         register_button = tk.Button(root,
                                     text="do Register",
@@ -223,10 +217,11 @@ def main():
     def run_update_loop():
         print("TODO call server readMessages")
         response = network.read_messages()
-        for dict in response["messages"]:
-            newMessage = Message(dict["from_user_id"], global_user_id, dict["message"], dict["date"])
-            chatManager.add_message(newMessage)
-            print("got new message " + str(newMessage.__dict__))
+        for message in response["messages"]:
+            # TODO remove new_message?
+            new_message = Message(message["from_user_id"], global_user_id, message["message"], message["date"])
+            chat_manager.add_message(new_message)
+            print("got new message " + str(new_message.__dict__))
 
         root.after(3000, run_update_loop)
 

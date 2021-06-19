@@ -18,9 +18,9 @@ class LoginResponse(Response):
 
 class GetUserResponse(Response):
 
-    def __init__(self, user_login, avatar, last_active):
+    def __init__(self, login, avatar, last_active):
         super().__init__("ok")
-        self.user_login = user_login
+        self.login = login
         self.avatar = avatar
         self.last_active = last_active
 
