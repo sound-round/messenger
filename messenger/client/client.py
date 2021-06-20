@@ -86,6 +86,26 @@ def main():
 
     def display_chats_ui():
 
+        def populate_dialog(frame, chat):
+            if not frame.winfo_exists():
+                return
+            remove_all(frame)
+            row = 0
+            for message in chat.messages:
+                message_text = message.message
+                tk.Label(frame, text=message_text).grid(row=row, column=0)
+                date = message.date
+                tk.Label(frame, text=date).grid(row=row + 1, column=1)
+                #TODO draw thin line separator
+                tk.Label(frame, text="----------").grid(row=row + 2, column=0)
+                row = row + 3
+
+            root.after(3000, populate_dialog, frame, chat)
+
+        def return_to_chats():
+            remove_all(root)
+            display_chats_ui()
+
         def open_dialog():
             login = entry.get()
             if not login:
@@ -105,19 +125,37 @@ def main():
             remove_all(root)
 
             #run_chat_update_loop() #TODO this function
+
+
+
             dialog_label = tk.Label(root, text=f"Chat with {login}")
             dialog_label.place(x=10, y=0, width=100, height=20)
+            message_text = tk.Text(root)
+            message_text.place(x=10, y=490, width=200, height=65)
+            scrollbar = tk.Scrollbar(message_text, command=message_text.yview)
+            scrollbar.pack(side="right", fill="y")
+            message_text.configure(yscrollcommand=scrollbar.set)
+            send_button = tk.Button(root, text="Send", command=send_message)
+            send_button.place(x=220, y=490, width=50, height=25)
+            back_button = tk.Button(root,
+                                text="Back",
+                                command=return_to_chats)
+            back_button.place(x=220, y=525, width=50, height=25)
+
 
             chat_canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
             chat_frame = tk.Frame(chat_canvas, background="#ffffff")
             chat_scroll_bar = tk.Scrollbar(root, orient="vertical", command=chat_canvas.yview)
             chat_canvas.configure(yscrollcommand=chat_scroll_bar.set)
-
-            chat_scroll_bar.place(x=300, y=70, width=20, height=455)
-            chat_canvas.place(x=0, y=70, width=300, height=455)
+            chat_scroll_bar.place(x=300, y=25, width=20, height=455)
+            chat_canvas.place(x=0, y=25, width=300, height=455)
             chat_canvas.create_window((4, 4), window=chat_frame, anchor="nw")
-
             chat_frame.bind("<Configure>", lambda event, canvas=chat_canvas: on_frame_configure(chat_canvas))
+
+            populate_dialog(chat_frame, chat)
+
+        def send_message():  # TODO this function
+            pass
 
         remove_all(root)
         
