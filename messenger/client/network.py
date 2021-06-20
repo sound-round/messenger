@@ -84,6 +84,25 @@ def read_messages():
     return response
 
 
+def send_message(to_user_id, message_to_send):
+    global global_auth_token
+    request_json = json.dumps(
+        {
+            'auth_token': global_auth_token,
+            'to_user_id': to_user_id,
+            'message': message_to_send,
+        }
+    )
+    print("request= " + request_json)
+    response = requests.post(
+        "http://127.0.0.1:8080/sendMessage", data=request_json
+    )
+    response_text = response.text
+    print("response= " + response_text)
+
+    return json.loads(response_text)
+
+
 def get_username(user_id):
     global global_auth_token
     request_json = json.dumps(

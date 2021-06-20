@@ -124,9 +124,20 @@ def main():
 
             remove_all(root)
 
-            #run_chat_update_loop() #TODO this function
+            def send_message():
+                to_user_id = with_user_id
+                message_to_send = message_text.get(1.0, tk.END)
 
+                response = network.send_message(
+                    to_user_id, message_to_send
+                )
+                result_text = StringVar()
+                result_text.set(
+                   ''.join(["result= ", response['result']])
+                )
 
+                result_label = tk.Label(root, textvariable=result_text)
+                result_label.place(x=10, y=470, width=250, height=20)
 
             dialog_label = tk.Label(root, text=f"Chat with {login}")
             dialog_label.place(x=10, y=0, width=100, height=20)
@@ -147,15 +158,13 @@ def main():
             chat_frame = tk.Frame(chat_canvas, background="#ffffff")
             chat_scroll_bar = tk.Scrollbar(root, orient="vertical", command=chat_canvas.yview)
             chat_canvas.configure(yscrollcommand=chat_scroll_bar.set)
-            chat_scroll_bar.place(x=300, y=25, width=20, height=455)
-            chat_canvas.place(x=0, y=25, width=300, height=455)
+            chat_scroll_bar.place(x=300, y=25, width=20, height=440)
+            chat_canvas.place(x=0, y=25, width=300, height=440)
             chat_canvas.create_window((4, 4), window=chat_frame, anchor="nw")
             chat_frame.bind("<Configure>", lambda event, canvas=chat_canvas: on_frame_configure(chat_canvas))
 
             populate_dialog(chat_frame, chat)
 
-        def send_message():  # TODO this function
-            pass
 
         remove_all(root)
         
@@ -165,11 +174,6 @@ def main():
         start_chat = tk.Button(root, text="Start chat", command=open_dialog)
         back_button = get_back_button()
 
-
-        #TODO open dialog with Login input -
-        # находит юзера по логину
-        # или показывает ошибку
-        # если нашло тогда показывает UI чата, где видны сообщения и можно отправить новое сообщение
 
         chat_label.place(x=10, y=0, width=100, height=20)
         login_label.place(x=10, y=25, width=120, height=20)
