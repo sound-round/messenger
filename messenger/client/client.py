@@ -91,14 +91,15 @@ def main():
                 return
             remove_all(frame)
             row = 0
-            for message in chat.messages:
-                message_text = message.message
-                tk.Label(frame, text=message_text).grid(row=row, column=0)
-                date = message.date
-                tk.Label(frame, text=date).grid(row=row + 1, column=1)
-                #TODO draw thin line separator
-                tk.Label(frame, text="----------").grid(row=row + 2, column=0)
-                row = row + 3
+            if chat:
+                for message in chat.messages:
+                    message_text = message.message
+                    tk.Label(frame, text=message_text).grid(row=row, column=0)
+                    date = message.date
+                    tk.Label(frame, text=date).grid(row=row + 1, column=1)
+                    #TODO draw thin line separator
+                    tk.Label(frame, text="----------").grid(row=row + 2, column=0)
+                    row = row + 3
 
             root.after(3000, populate_dialog, frame, chat)
 
