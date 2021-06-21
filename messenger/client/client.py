@@ -128,6 +128,7 @@ def main():
             def send_message():
                 to_user_id = with_user_id
                 message_to_send = message_text.get(1.0, tk.END)
+                message_text.delete(1.0, tk.END)
 
                 response = network.send_message(
                     to_user_id, message_to_send
