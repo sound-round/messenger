@@ -133,6 +133,8 @@ def main():
                 response = network.send_message(
                     to_user_id, message_to_send
                 )
+                if response['result'] != "ok":
+                    return
                 result_text = StringVar()
                 result_text.set(
                    ''.join(["result= ", response['result']])
@@ -167,15 +169,37 @@ def main():
 
             populate_dialog(chat_frame, chat)
 
+        def populate_chats(frame):
+            if not frame.winfo_exists():
+                return
+            remove_all(frame)
+            row = 0
+            for chat in chat_manager.store:
+                response = get_username(chat.with_user_id)
+                if response['result'] != "ok":
+                    result_text.set(
+                        ''.join(["result= ", response['result']])
+                    )
+                    return
+                with_user_login = response['login']
+                tk.Label(frame, text=with_user_login).grid(row=row, column=0)
+                last_message_text = chat.messages[-1].message
+                tk.Label(frame, text=last_message_text).grid(row=row + 1, column=0)
+                #TODO draw thin line separator
+                tk.Label(frame, text="----------").grid(row=row + 2, column=0)
+                #separator = ttk.Separator(frame, orient='horizontal')
+                #separator.pack(fill='x')
+                row = row + 3
+
+            root.after(3000, populate_chats, frame)
 
         remove_all(root)
         
-        run_update_loop()
+
         chat_label = tk.Label(root, text="ChatManager")
         login_label = tk.Label(root, text="Enter user login: ")
         start_chat = tk.Button(root, text="Start chat", command=open_dialog)
         back_button = get_back_button()
-
 
         chat_label.place(x=10, y=0, width=100, height=20)
         login_label.place(x=10, y=25, width=120, height=20)
@@ -186,25 +210,10 @@ def main():
         entry.place(x=130, y=25)
         result_text = StringVar()
         result_label = tk.Label(root, textvariable=result_text)
-        result_label.place(x=130, y=50, width=160, height=20)
+        result_label.place(x=120, y=50, width=188, height=20)
+        run_update_loop(result_text)
 
 
-        def populate_chats(frame):
-            if not frame.winfo_exists():
-                return
-            remove_all(frame)
-            row = 0
-            for chat in chat_manager.store:
-                tk.Label(frame, text=get_username(chat.with_user_id)).grid(row=row, column=0)
-                last_message_text = chat.messages[-1].message
-                tk.Label(frame, text=last_message_text).grid(row=row + 1, column=0)
-                #TODO draw thin line separator
-                tk.Label(frame, text="----------").grid(row=row + 2, column=0)
-                #separator = ttk.Separator(frame, orient='horizontal')
-                #separator.pack(fill='x')
-                row = row + 3
-
-            root.after(3000, populate_chats, frame)
 
         def on_frame_configure(canvas):
             '''Reset the scroll region to encompass the inner frame'''
@@ -221,6 +230,7 @@ def main():
         canvas.create_window((4, 4), window=frame, anchor="nw")
 
         frame.bind("<Configure>", lambda event, canvas=canvas: on_frame_configure(canvas))
+
 
         populate_chats(frame)
 
@@ -313,15 +323,20 @@ def main():
         register_button.grid(row=0, column=1, pady=10)
         get_quit_button().grid(row=1)
 
-    def run_update_loop():
+    def run_update_loop(result_text):
         print("TODO call server readMessages")
         response = network.read_messages()
+        if response['result'] != "ok":
+            result_text.set(
+                ''.join(["result= ", response['result']])
+            )
+            return
         for message in response["messages"]:
             new_message = Message(message["from_user_id"], global_user_id, message["message"], message["date"])
             chat_manager.add_message(new_message)
             print("got new message " + str(new_message.__dict__))
 
-        root.after(3000, run_update_loop)
+        root.after(3000, run_update_loop, result_text)
 
     root = tk.Tk()
     root.title("messenger")

@@ -62,6 +62,7 @@ def do_actual_login(login, password):
     response_text = '''{
            "result": "internal_server_error"
        }'''
+    print(f"response text: {response_text}")
     return json.loads(response_text)
 
 
@@ -74,14 +75,23 @@ def read_messages():
         }
     )
     print("request= " + request_json)
-    response = requests.post(
-        "http://127.0.0.1:8080/readMessages", data=request_json
-    )
-    response_text = response.text
-    print("response= " + response_text)
-    response = json.loads(response_text)
-    global_since_date = response["current_time"]
-    return response
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8080/readMessages", data=request_json
+        )
+    except ConnectionError as e:
+        print(e)
+    else:
+        response_text = response.text
+        print("response= " + response_text)
+        response = json.loads(response_text)
+        global_since_date = response["current_time"]
+        return response
+    response_text = '''{
+               "result": "internal_server_error"
+           }'''
+    print(f"response text: {response_text}")
+    return json.loads(response_text)
 
 
 def send_message(to_user_id, message_to_send):
@@ -94,12 +104,21 @@ def send_message(to_user_id, message_to_send):
         }
     )
     print("request= " + request_json)
-    response = requests.post(
-        "http://127.0.0.1:8080/sendMessage", data=request_json
-    )
-    response_text = response.text
-    print("response= " + response_text)
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8080/sendMessage", data=request_json
+        )
+    except ConnectionError as e:
+        print(e)
+    else:
+        response_text = response.text
+        print("response= " + response_text)
+        return json.loads(response_text)
 
+    response_text = '''{
+                   "result": "internal_server_error"
+               }'''
+    print(f"response text: {response_text}")
     return json.loads(response_text)
 
 
@@ -111,12 +130,21 @@ def get_username(user_id):
             'user_id_to_get': user_id
         }
     )
-    response = requests.post(
-        "http://127.0.0.1:8080/getUser", data=request_json
-    )
-    response_text = response.text
-    response = json.loads(response_text)
-    return response['login']
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8080/getUser", data=request_json
+        )
+    except ConnectionError as e:
+        print(e)
+    else:
+        response_text = response.text
+        response = json.loads(response_text)
+        return response
+    response_text = '''{
+                       "result": "internal_server_error"
+                   }'''
+    print(f"response text: {response_text}")
+    return json.loads(response_text)
 
 
 def find_user_id(login):
@@ -127,10 +155,19 @@ def find_user_id(login):
             'user_login_to_get': login
         }
     )
-    response = requests.post(
-        "http://127.0.0.1:8080/findUserId", data=request_json
-    )
-    response_text = response.text
-    response = json.loads(response_text)
-    print(response_text)
-    return response
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8080/findUserId", data=request_json
+        )
+    except ConnectionError as e:
+        print(e)
+    else:
+        response_text = response.text
+        response = json.loads(response_text)
+        print(response_text)
+        return response
+    response_text = '''{
+                       "result": "internal_server_error"
+                   }'''
+    print(f"response text: {response_text}")
+    return json.loads(response_text)
