@@ -28,14 +28,27 @@ from http.server import BaseHTTPRequestHandler
 import json
 
 from messenger.server.messages import Message
-from messenger.common.user import User, \
-    AuthTokenManager, RegisteredUsersManager, generate_auth_token
+from messenger.common.user import generate_auth_token
+from messenger.common.user import User#, \
+ #   AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
 from messenger.common import responses
+import psycopg2
+import psycopg2.extras
+
+con = psycopg2.connect(
+  database="messenger",
+  user="denis",
+  password="qwe",
+  host="127.0.0.1",
+  port="5432"
+)
+print("Database opened successfully")
+cur = con.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)  #cursor_factory=psycopg2.extras.DictCursor)
 
 
-registered_users = RegisteredUsersManager()
-auth_token_store = AuthTokenManager()
+#registered_users = RegisteredUsersManager()
+#auth_token_store = AuthTokenManager()
 
 
 def current_time():
@@ -71,16 +84,19 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.handle_set_avatar()
 
     def handle_register(self):
-        print(f'register handle beginning: {current_time()}')
         post_body = self.get_post_body()
         login = json.loads(post_body).get('login')
         password = json.loads(post_body).get('password')
-        print(post_body)
-        print(f'register post body formed: {current_time()}')
+        print(f'post body: {post_body}')
+
         if login is None or len(login) == 0:
             self.write_response(responses.Response("login_is_missing"))
             return
-        if registered_users.is_login_in_store(login):
+
+        cur.execute(f"""SELECT id FROM registered_users 
+                        WHERE login = '{login}'""")
+        SQL_response = cur.fetchall()
+        if SQL_response:
             self.write_response(responses.Response("user_already_registered"))
             return
         if len(password) == 0:
@@ -91,9 +107,13 @@ class ServerHandler(BaseHTTPRequestHandler):
                 "password_must_be_6_or_more_characters_long"
             ))
             return
-        user = User(login, password)
-        registered_users.add_user(user)
-        #registered_users.show_users()
+
+
+        cur.execute(
+            f"""INSERT INTO registered_users (login, password) 
+            VALUES ({login}, {password})""")
+        con.commit()
+
 
         self.write_response(responses.Response("user_registered"))
 
@@ -107,16 +127,22 @@ class ServerHandler(BaseHTTPRequestHandler):
         if len(password) == 0:
             self.write_response(responses.Response("password_is_missing"))
             return
-        if registered_users.is_login_in_store(login):
-            user = registered_users.get_user_by_login(login)
-            if not user.check_password(password):
+        cur.execute(f"""SELECT * FROM registered_users 
+                                WHERE login = '{login}'""")
+        user_data = cur.fetchone()
+        print(f'sql_response: {user_data}')
+        if user_data:
+            if user_data.password != (password):
                 self.write_response(responses.Response("wrong_password"))
                 return
 
             auth_token = generate_auth_token()
-            auth_token_store.add_user(user, auth_token)
+            cur.execute(
+                f"""INSERT INTO auth_tokens (user_id, auth_token) 
+                        VALUES ({user_data.id}, '{auth_token}')""")
+            con.commit()
             self.write_response(
-                responses.LoginResponse(user.get_id(), auth_token)
+                responses.LoginResponse(user_data.id, auth_token)
             )
             return
 
@@ -125,7 +151,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     def handle_send_message(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
-        #from_user_id = json.loads(post_body)['from_user_id'] # is it right? Or it should be found in user_store?
+
         to_user_id = json.loads(post_body)['to_user_id']
         message_text = json.loads(post_body)['message']
         from_user = auth_token_store.get_user_by_auth_token(auth_token)
