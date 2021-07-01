@@ -132,7 +132,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         user_data = cur.fetchone()
         print(f'sql_response: {user_data}')
         if user_data:
-            if user_data.password != (password):
+            if user_data.password != password:
                 self.write_response(responses.Response("wrong_password"))
                 return
 
@@ -154,23 +154,29 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         to_user_id = json.loads(post_body)['to_user_id']
         message_text = json.loads(post_body)['message']
-        from_user = auth_token_store.get_user_by_auth_token(auth_token)
-        from_user_id = from_user.get_id()
+        #from_user = auth_token_store.get_user_by_auth_token(auth_token)
+        cur.execute(f"""SELECT * FROM auth_tokens 
+                        WHERE auth_token = '{auth_token}'""")
+        from_user = cur.fetchone()
+        #from_user_id = from_user.get_id()
         if from_user is None:
             self.write_response(responses.Response("unknown_auth_token"))
             return
 
-        if not registered_users.is_id_in_store(to_user_id):
+        cur.execute(f"""SELECT * FROM registered_users 
+                                WHERE id = {to_user_id}""")
+        to_user = cur.fetchone()
+        if not to_user:
             self.write_response(responses.Response("user_is_missing"))
             return
         if len(message_text) == 0:
             self.write_response(responses.Response("message_is_missing"))
             return
         date = current_time()
-        print(date)
-        message = Message(from_user_id, to_user_id, message_text, date)
+        #print(date)
+        message = Message(from_user.id, to_user.id, message_text, date)
         messages_store.store.append(message)
-        print(messages_store.store)
+        #print(messages_store.store)
         self.write_response(responses.Response("message_has_delivered"))
 
     def handle_read_message(self):
