@@ -264,21 +264,27 @@ class ServerHandler(BaseHTTPRequestHandler):
             datetime.datetime.timestamp(user_to_get.last_active),
         ))
 
-    #TODO find out if it is nessasary
     def handle_find_user_id(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         login = json.loads(post_body)['user_login_to_get']
-        if not auth_token_store.is_token_in_store(auth_token):
+
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            registered_users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-        if not registered_users.is_login_in_store(login):
+        user_to_find = session.query(User).filter(User.login == login)
+        if not user_to_find:
             self.write_response(responses.Response("user_is_missing"))
             return
-        user = registered_users.get_user_by_login(login)
 
         self.write_response(responses.FindUserIDResponse(
-            user.get_id(),
+            user_to_find.id,
         ))
 
 
