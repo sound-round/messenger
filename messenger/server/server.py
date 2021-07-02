@@ -244,19 +244,27 @@ class ServerHandler(BaseHTTPRequestHandler):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         user_id_to_get = json.loads(post_body)['user_id_to_get']
-        if not auth_token_store.is_token_in_store(auth_token):
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            registered_users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-        if not registered_users.is_id_in_store(user_id_to_get):
+        user_to_get = session.query(User).filter(registered_users.c.id == user_id_to_get).first()
+        if not user_to_get:
             self.write_response(responses.Response("user_is_missing"))
             return
-        user = registered_users.get_user_by_id(user_id_to_get)
-        last_active = None  # How should it be implemented?
 
         self.write_response(responses.GetUserResponse(
-            user.get_login(), user.get_avatar(), last_active,
+            user_to_get.login,
+            user_to_get.avatar_url,
+            datetime.datetime.timestamp(user_to_get.last_active),
         ))
 
+    #TODO find out if it is nessasary
     def handle_find_user_id(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
