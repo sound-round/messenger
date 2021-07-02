@@ -149,29 +149,33 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         to_user_id = json.loads(post_body)['to_user_id']
         message_text = json.loads(post_body)['message']
-        #from_user = auth_token_store.get_user_by_auth_token(auth_token)
-        cur.execute(f"""SELECT * FROM auth_tokens 
-                        WHERE auth_token = '{auth_token}'""")
-        from_user = cur.fetchone()
-        #from_user_id = from_user.get_id()
+
+        session = db_session()
+        from_user = session.query(
+            User, AuthToken
+        ).filter(
+            registered_users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+
         if from_user is None:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-
-        cur.execute(f"""SELECT * FROM registered_users 
-                                WHERE id = {to_user_id}""")
-        to_user = cur.fetchone()
-        if not to_user:
+        if not to_user_id:
             self.write_response(responses.Response("user_is_missing"))
+            return
+
+        to_user = session.query(User).filter(registered_users.c.id == to_user_id).first()
+        if not to_user:
+            self.write_response(responses.Response("user_is_not_found"))
             return
         if len(message_text) == 0:
             self.write_response(responses.Response("message_is_missing"))
             return
         date = current_time()
-        #print(date)
-        message = Message(from_user.id, to_user.id, message_text, date)
+        message = Message(from_user.User.id, to_user.id, message_text, date)
         messages_store.store.append(message)
-        #print(messages_store.store)
+        session.commit()
+        session.close()
         self.write_response(responses.Response("message_has_delivered"))
 
     def handle_read_message(self):
