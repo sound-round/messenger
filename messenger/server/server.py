@@ -28,27 +28,27 @@ from http.server import BaseHTTPRequestHandler
 import json
 
 from messenger.server.messages import Message
-from messenger.common.user import generate_auth_token
-from messenger.common.user import User#, \
+from messenger.common.user import generate_auth_token, AuthToken, User
+#from messenger.common.user import User#, \
  #   AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
 from messenger.common import responses
 import psycopg2
 import psycopg2.extras
+import sqlalchemy as sa
+from sqlalchemy.orm import mapper, relationship, sessionmaker
 
-con = psycopg2.connect(
-  database="messenger",
-  user="denis",
-  password="qwe",
-  host="127.0.0.1",
-  port="5432"
-)
+
+engine = sa.create_engine('postgresql+psycopg2://denis:qwe@127.0.0.1/messenger')
+meta = sa.MetaData(engine)
+#TODO Column('right_id', Integer, ForeignKey('right.id') if it nessasary
+registered_users = sa.Table('registered_users', meta,  sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
+auth_token_manager = sa.Table('auth_tokens', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
+mapper(User, registered_users, allow_partial_pks=True)
+mapper(AuthToken, auth_token_manager)
+db_session = sessionmaker(bind=engine)
+db_session.configure()
 print("Database opened successfully")
-cur = con.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)  #cursor_factory=psycopg2.extras.DictCursor)
-
-
-#registered_users = RegisteredUsersManager()
-#auth_token_store = AuthTokenManager()
 
 
 def current_time():
@@ -93,9 +93,9 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("login_is_missing"))
             return
 
-        cur.execute(f"""SELECT id FROM registered_users 
-                        WHERE login = '{login}'""")
-        SQL_response = cur.fetchall()
+
+        session = db_session()
+        SQL_response = session.query(User).filter(User.login == login).first()
         if SQL_response:
             self.write_response(responses.Response("user_already_registered"))
             return
@@ -107,13 +107,10 @@ class ServerHandler(BaseHTTPRequestHandler):
                 "password_must_be_6_or_more_characters_long"
             ))
             return
-
-
-        cur.execute(
-            f"""INSERT INTO registered_users (login, password) 
-            VALUES ({login}, {password})""")
-        con.commit()
-
+        user = User(login, password)
+        session.add(user)
+        session.commit()
+        session.close()
 
         self.write_response(responses.Response("user_registered"))
 
@@ -127,26 +124,24 @@ class ServerHandler(BaseHTTPRequestHandler):
         if len(password) == 0:
             self.write_response(responses.Response("password_is_missing"))
             return
-        cur.execute(f"""SELECT * FROM registered_users 
-                                WHERE login = '{login}'""")
-        user_data = cur.fetchone()
-        print(f'sql_response: {user_data}')
-        if user_data:
-            if user_data.password != password:
-                self.write_response(responses.Response("wrong_password"))
-                return
 
-            auth_token = generate_auth_token()
-            cur.execute(
-                f"""INSERT INTO auth_tokens (user_id, auth_token) 
-                        VALUES ({user_data.id}, '{auth_token}')""")
-            con.commit()
-            self.write_response(
-                responses.LoginResponse(user_data.id, auth_token)
-            )
+        session = db_session()
+        user = session.query(User).filter(User.login == login).first()
+        if not user:
+            self.write_response(responses.Response("unknown_login"))
+        if user.password != password:
+            self.write_response(responses.Response("wrong_password"))
             return
 
-        self.write_response(responses.Response("unknown_login"))
+        user_auth_token = AuthToken(user.id, generate_auth_token())
+        session.add(user_auth_token)
+        session.commit()
+        self.write_response(
+            responses.LoginResponse(user.id, user_auth_token.auth_token)
+        )
+        session.close()
+        return
+
 
     def handle_send_message(self):
         post_body = self.get_post_body()
