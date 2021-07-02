@@ -54,6 +54,9 @@ print("Database opened successfully")
 def current_time():
     return int(datetime.datetime.utcnow().timestamp() * 1000)
 
+def convert_date(time):
+    time /= 1000
+    return datetime.datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S')
 
 class ServerHandler(BaseHTTPRequestHandler):
 
@@ -171,34 +174,43 @@ class ServerHandler(BaseHTTPRequestHandler):
         if len(message_text) == 0:
             self.write_response(responses.Response("message_is_missing"))
             return
-        date = current_time()
+        timestamp_date = current_time()
+        date = convert_date(timestamp_date)
         message = Message(from_user.User.id, to_user.id, message_text, date)
         messages_store.store.append(message)
         session.commit()
         session.close()
         self.write_response(responses.Response("message_has_delivered"))
 
+
     def handle_read_message(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         since_date = json.loads(post_body)['since_date']
 
-        user = auth_token_store.get_user_by_auth_token(auth_token)  # переделать
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            registered_users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
         var_current_time = current_time()
 
-        if user is None:
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
 
-        #if user is not None:
-        user.last_active = var_current_time
-        print("handle_read_message user=" + str(user))
+
+        user.User.last_active = convert_date(var_current_time)
+        session.add(user.User)
+        session.commit()
         messages_to_read = []
+        since_date = convert_date(since_date)
         for message in messages_store.store:
-            if message.to_user_id == user.get_id() and \
+            if message.to_user_id == user.User.id and \
                     message.date >= since_date:
                 messages_to_read.append(message)
-
+        session.close()
         self.write_response(
             responses.ReadMessagesResponse(messages_to_read, var_current_time)
         )
