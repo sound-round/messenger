@@ -194,13 +194,11 @@ class ServerHandler(BaseHTTPRequestHandler):
         ).filter(
             registered_users.c.id == auth_token_manager.c.user_id
         ).filter(auth_token_manager.c.auth_token == auth_token).first()
-        var_current_time = current_time()
 
         if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-
-
+        var_current_time = current_time()
         user.User.last_active = convert_date(var_current_time)
         session.add(user.User)
         session.commit()
@@ -220,7 +218,14 @@ class ServerHandler(BaseHTTPRequestHandler):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         avatar_url = json.loads(post_body)['avatar_url']
-        if not auth_token_store.is_token_in_store(auth_token):
+
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            registered_users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
         if len(avatar_url) == 0:
@@ -229,10 +234,10 @@ class ServerHandler(BaseHTTPRequestHandler):
         if not validators.url(avatar_url):
             self.write_response(responses.Response("url_is_not_valid"))
             return
-        # http request url
-        user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
-        user = registered_users.get_user_by_id(user_id)
-        user.set_avatar(avatar_url)
+
+        user.User.avatar_url = avatar_url
+        session.commit()
+        session.close()
         self.write_response(responses.Response("avatar_has_been_set"))
 
     def handle_get_user(self):
