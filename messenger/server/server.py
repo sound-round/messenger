@@ -29,8 +29,6 @@ import json
 
 from messenger.server.messages import Message
 from messenger.common.user import generate_auth_token, AuthToken, User
-#from messenger.common.user import User#, \
- #   AuthTokenManager, RegisteredUsersManager, generate_auth_token
 import validators
 from messenger.common import responses
 import psycopg2
