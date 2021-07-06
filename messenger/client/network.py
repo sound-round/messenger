@@ -85,7 +85,7 @@ def read_messages():
         response_text = response.text
         print("response= " + response_text)
         response = json.loads(response_text)
-        global_since_date = response["current_time"]
+        global_since_date = response.get("current_time")
         return response
     response_text = '''{
                "result": "internal_server_error"

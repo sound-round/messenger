@@ -130,6 +130,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         user = session.query(User).filter(User.login == login).first()
         if not user:
             self.write_response(responses.Response("unknown_login"))
+            return
         if user.password != password:
             self.write_response(responses.Response("wrong_password"))
             return
