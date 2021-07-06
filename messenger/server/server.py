@@ -28,32 +28,33 @@ from http.server import BaseHTTPRequestHandler
 import json
 
 from messenger.server.messages import Message
-from messenger.common.user import generate_auth_token
-from messenger.common.user import User#, \
- #   AuthTokenManager, RegisteredUsersManager, generate_auth_token
+from messenger.common.user import generate_auth_token, AuthToken, User
 import validators
 from messenger.common import responses
 import psycopg2
 import psycopg2.extras
+import sqlalchemy as sa
+from sqlalchemy.orm import mapper, relationship, sessionmaker
 
-con = psycopg2.connect(
-  database="messenger",
-  user="denis",
-  password="qwe",
-  host="127.0.0.1",
-  port="5432"
-)
+
+engine = sa.create_engine('postgresql+psycopg2://denis:qwe@127.0.0.1/messenger')
+meta = sa.MetaData(engine)
+#TODO Column('right_id', Integer, ForeignKey('right.id') if it nessasary
+users = sa.Table('users', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
+auth_token_manager = sa.Table('auth_tokens', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
+mapper(User, users, allow_partial_pks=True)
+mapper(AuthToken, auth_token_manager)
+db_session = sessionmaker(bind=engine)
+db_session.configure()
 print("Database opened successfully")
-cur = con.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)  #cursor_factory=psycopg2.extras.DictCursor)
-
-
-#registered_users = RegisteredUsersManager()
-#auth_token_store = AuthTokenManager()
 
 
 def current_time():
-    return int(datetime.datetime.utcnow().timestamp() * 1000)
+    return datetime.datetime.utcnow().timestamp() * 1000
 
+def convert_date(time):
+    time /= 1000
+    return datetime.datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S')
 
 class ServerHandler(BaseHTTPRequestHandler):
 
@@ -93,9 +94,9 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("login_is_missing"))
             return
 
-        cur.execute(f"""SELECT id FROM registered_users 
-                        WHERE login = '{login}'""")
-        SQL_response = cur.fetchall()
+
+        session = db_session()
+        SQL_response = session.query(User).filter(User.login == login).first()
         if SQL_response:
             self.write_response(responses.Response("user_already_registered"))
             return
@@ -107,13 +108,10 @@ class ServerHandler(BaseHTTPRequestHandler):
                 "password_must_be_6_or_more_characters_long"
             ))
             return
-
-
-        cur.execute(
-            f"""INSERT INTO registered_users (login, password) 
-            VALUES ({login}, {password})""")
-        con.commit()
-
+        user = User(login, password)
+        session.add(user)
+        session.commit()
+        session.close()
 
         self.write_response(responses.Response("user_registered"))
 
@@ -127,26 +125,25 @@ class ServerHandler(BaseHTTPRequestHandler):
         if len(password) == 0:
             self.write_response(responses.Response("password_is_missing"))
             return
-        cur.execute(f"""SELECT * FROM registered_users 
-                                WHERE login = '{login}'""")
-        user_data = cur.fetchone()
-        print(f'sql_response: {user_data}')
-        if user_data:
-            if user_data.password != password:
-                self.write_response(responses.Response("wrong_password"))
-                return
 
-            auth_token = generate_auth_token()
-            cur.execute(
-                f"""INSERT INTO auth_tokens (user_id, auth_token) 
-                        VALUES ({user_data.id}, '{auth_token}')""")
-            con.commit()
-            self.write_response(
-                responses.LoginResponse(user_data.id, auth_token)
-            )
+        session = db_session()
+        user = session.query(User).filter(User.login == login).first()
+        if not user:
+            self.write_response(responses.Response("unknown_login"))
+            return
+        if user.password != password:
+            self.write_response(responses.Response("wrong_password"))
             return
 
-        self.write_response(responses.Response("unknown_login"))
+        user_auth_token = AuthToken(user.id, generate_auth_token())
+        session.add(user_auth_token)
+        session.commit()
+        self.write_response(
+            responses.LoginResponse(user.id, user_auth_token.auth_token)
+        )
+        session.close()
+        return
+
 
     def handle_send_message(self):
         post_body = self.get_post_body()
@@ -154,62 +151,81 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         to_user_id = json.loads(post_body)['to_user_id']
         message_text = json.loads(post_body)['message']
-        #from_user = auth_token_store.get_user_by_auth_token(auth_token)
-        cur.execute(f"""SELECT * FROM auth_tokens 
-                        WHERE auth_token = '{auth_token}'""")
-        from_user = cur.fetchone()
-        #from_user_id = from_user.get_id()
+
+        session = db_session()
+        from_user = session.query(
+            User, AuthToken
+        ).filter(
+            users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+
         if from_user is None:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-
-        cur.execute(f"""SELECT * FROM registered_users 
-                                WHERE id = {to_user_id}""")
-        to_user = cur.fetchone()
-        if not to_user:
+        if not to_user_id:
             self.write_response(responses.Response("user_is_missing"))
+            return
+
+        to_user = session.query(User).filter(users.c.id == to_user_id).first()
+        if not to_user:
+            self.write_response(responses.Response("user_is_not_found"))
             return
         if len(message_text) == 0:
             self.write_response(responses.Response("message_is_missing"))
             return
-        date = current_time()
-        #print(date)
-        message = Message(from_user.id, to_user.id, message_text, date)
+        #timestamp_date = current_time()
+        date = current_time()  #convert_date(timestamp_date)
+        message = Message(from_user.User.id, to_user.id, message_text, date)
         messages_store.store.append(message)
-        #print(messages_store.store)
+        session.commit()
+        session.close()
         self.write_response(responses.Response("message_has_delivered"))
+
 
     def handle_read_message(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         since_date = json.loads(post_body)['since_date']
 
-        user = auth_token_store.get_user_by_auth_token(auth_token)  # переделать
-        var_current_time = current_time()
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
 
-        if user is None:
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-
-        #if user is not None:
-        user.last_active = var_current_time
-        print("handle_read_message user=" + str(user))
+        #var_current_time = current_time()
+        user.User.last_active = current_time()  #convert_date(var_current_time)
+        session.add(user.User)
+        session.commit()
         messages_to_read = []
+        #since_date = convert_date(since_date)
         for message in messages_store.store:
-            if message.to_user_id == user.get_id() and \
+            if message.to_user_id == user.User.id and \
                     message.date >= since_date:
                 messages_to_read.append(message)
 
         self.write_response(
-            responses.ReadMessagesResponse(messages_to_read, var_current_time)
+            responses.ReadMessagesResponse(messages_to_read, int(user.User.last_active))
         )
+        session.close()
 
     # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         avatar_url = json.loads(post_body)['avatar_url']
-        if not auth_token_store.is_token_in_store(auth_token):
+
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
         if len(avatar_url) == 0:
@@ -218,43 +234,57 @@ class ServerHandler(BaseHTTPRequestHandler):
         if not validators.url(avatar_url):
             self.write_response(responses.Response("url_is_not_valid"))
             return
-        # http request url
-        user_id = auth_token_store.get_user_by_auth_token(auth_token).get_id()
-        user = registered_users.get_user_by_id(user_id)
-        user.set_avatar(avatar_url)
+
+        user.User.avatar_url = avatar_url
+        session.commit()
+        session.close()
         self.write_response(responses.Response("avatar_has_been_set"))
 
     def handle_get_user(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         user_id_to_get = json.loads(post_body)['user_id_to_get']
-        if not auth_token_store.is_token_in_store(auth_token):
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-        if not registered_users.is_id_in_store(user_id_to_get):
+        user_to_get = session.query(User).filter(users.c.id == user_id_to_get).first()
+        if not user_to_get:
             self.write_response(responses.Response("user_is_missing"))
             return
-        user = registered_users.get_user_by_id(user_id_to_get)
-        last_active = None  # How should it be implemented?
 
         self.write_response(responses.GetUserResponse(
-            user.get_login(), user.get_avatar(), last_active,
+            user_to_get.login,
+            user_to_get.avatar_url,
+            datetime.datetime.timestamp(user_to_get.last_active),
         ))
 
     def handle_find_user_id(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         login = json.loads(post_body)['user_login_to_get']
-        if not auth_token_store.is_token_in_store(auth_token):
+
+        session = db_session()
+        user = session.query(
+            User, AuthToken
+        ).filter(
+            users.c.id == auth_token_manager.c.user_id
+        ).filter(auth_token_manager.c.auth_token == auth_token).first()
+        if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-        if not registered_users.is_login_in_store(login):
+        user_to_find = session.query(User).filter(User.login == login)
+        if not user_to_find:
             self.write_response(responses.Response("user_is_missing"))
             return
-        user = registered_users.get_user_by_login(login)
 
         self.write_response(responses.FindUserIDResponse(
-            user.get_id(),
+            user_to_find.id,
         ))
 
 
