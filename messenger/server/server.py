@@ -40,9 +40,9 @@ from sqlalchemy.orm import mapper, relationship, sessionmaker
 engine = sa.create_engine('postgresql+psycopg2://denis:qwe@127.0.0.1/messenger')
 meta = sa.MetaData(engine)
 #TODO Column('right_id', Integer, ForeignKey('right.id') if it nessasary
-registered_users = sa.Table('registered_users', meta,  sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
+users = sa.Table('users', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
 auth_token_manager = sa.Table('auth_tokens', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
-mapper(User, registered_users, allow_partial_pks=True)
+mapper(User, users, allow_partial_pks=True)
 mapper(AuthToken, auth_token_manager)
 db_session = sessionmaker(bind=engine)
 db_session.configure()
@@ -50,7 +50,7 @@ print("Database opened successfully")
 
 
 def current_time():
-    return int(datetime.datetime.utcnow().timestamp() * 1000)
+    return datetime.datetime.utcnow().timestamp() * 1000
 
 def convert_date(time):
     time /= 1000
@@ -155,7 +155,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         from_user = session.query(
             User, AuthToken
         ).filter(
-            registered_users.c.id == auth_token_manager.c.user_id
+            users.c.id == auth_token_manager.c.user_id
         ).filter(auth_token_manager.c.auth_token == auth_token).first()
 
         if from_user is None:
@@ -165,15 +165,15 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("user_is_missing"))
             return
 
-        to_user = session.query(User).filter(registered_users.c.id == to_user_id).first()
+        to_user = session.query(User).filter(users.c.id == to_user_id).first()
         if not to_user:
             self.write_response(responses.Response("user_is_not_found"))
             return
         if len(message_text) == 0:
             self.write_response(responses.Response("message_is_missing"))
             return
-        timestamp_date = current_time()
-        date = convert_date(timestamp_date)
+        #timestamp_date = current_time()
+        date = current_time()  #convert_date(timestamp_date)
         message = Message(from_user.User.id, to_user.id, message_text, date)
         messages_store.store.append(message)
         session.commit()
@@ -190,26 +190,27 @@ class ServerHandler(BaseHTTPRequestHandler):
         user = session.query(
             User, AuthToken
         ).filter(
-            registered_users.c.id == auth_token_manager.c.user_id
+            users.c.id == auth_token_manager.c.user_id
         ).filter(auth_token_manager.c.auth_token == auth_token).first()
 
         if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-        var_current_time = current_time()
-        user.User.last_active = convert_date(var_current_time)
+        #var_current_time = current_time()
+        user.User.last_active = current_time()  #convert_date(var_current_time)
         session.add(user.User)
         session.commit()
         messages_to_read = []
-        since_date = convert_date(since_date)
+        #since_date = convert_date(since_date)
         for message in messages_store.store:
             if message.to_user_id == user.User.id and \
                     message.date >= since_date:
                 messages_to_read.append(message)
-        session.close()
+
         self.write_response(
-            responses.ReadMessagesResponse(messages_to_read, var_current_time)
+            responses.ReadMessagesResponse(messages_to_read, int(user.User.last_active))
         )
+        session.close()
 
     # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):
@@ -221,7 +222,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         user = session.query(
             User, AuthToken
         ).filter(
-            registered_users.c.id == auth_token_manager.c.user_id
+            users.c.id == auth_token_manager.c.user_id
         ).filter(auth_token_manager.c.auth_token == auth_token).first()
         if not user:
             self.write_response(responses.Response("unknown_auth_token"))
@@ -246,12 +247,12 @@ class ServerHandler(BaseHTTPRequestHandler):
         user = session.query(
             User, AuthToken
         ).filter(
-            registered_users.c.id == auth_token_manager.c.user_id
+            users.c.id == auth_token_manager.c.user_id
         ).filter(auth_token_manager.c.auth_token == auth_token).first()
         if not user:
             self.write_response(responses.Response("unknown_auth_token"))
             return
-        user_to_get = session.query(User).filter(registered_users.c.id == user_id_to_get).first()
+        user_to_get = session.query(User).filter(users.c.id == user_id_to_get).first()
         if not user_to_get:
             self.write_response(responses.Response("user_is_missing"))
             return
@@ -271,7 +272,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         user = session.query(
             User, AuthToken
         ).filter(
-            registered_users.c.id == auth_token_manager.c.user_id
+            users.c.id == auth_token_manager.c.user_id
         ).filter(auth_token_manager.c.auth_token == auth_token).first()
         if not user:
             self.write_response(responses.Response("unknown_auth_token"))
