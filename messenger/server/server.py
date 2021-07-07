@@ -21,7 +21,7 @@
 #TODO add expiring for auth_token
 #TODO low priority: create html+javascript (webstorm ide) client?
 
-
+import decimal
 import datetime
 import socketserver
 from http.server import BaseHTTPRequestHandler
@@ -39,15 +39,36 @@ from sqlalchemy.orm import mapper, relationship, sessionmaker
 
 engine = sa.create_engine('postgresql+psycopg2://denis:qwe@127.0.0.1/messenger')
 meta = sa.MetaData(engine)
-#TODO Column('right_id', Integer, ForeignKey('right.id') if it nessasary
-users = sa.Table('users', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
-auth_token_manager = sa.Table('auth_tokens', meta, sa.Column("id", sa.BigInteger, primary_key=True), autoload=True)
-mapper(User, users, allow_partial_pks=True)
+#todo Column('right_id', Integer, ForeignKey('right.id') if it nessasary
+users = sa.Table(
+    'users', meta, sa.Column(
+        "id", sa.BigInteger, primary_key=True
+    ), autoload=True
+)
+auth_token_manager = sa.Table(
+    'auth_tokens', meta, sa.Column(
+        "id", sa.BigInteger, primary_key=True
+    ), autoload=True
+)
+messages = sa.Table(
+    'messages', meta, sa.Column(
+        "id", sa.BigInteger, primary_key=True
+    ), autoload=True
+)
+mapper(User, users)
 mapper(AuthToken, auth_token_manager)
+mapper(Message, messages)
 db_session = sessionmaker(bind=engine)
 db_session.configure()
 print("Database opened successfully")
 
+
+def object_to_list(object_):
+    lines = []
+    for row in object_:
+        print(f'row: {vars(row)}')
+        lines.append(vars(row))
+    return lines
 
 def current_time():
     return datetime.datetime.utcnow().timestamp() * 1000
@@ -176,7 +197,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         #timestamp_date = current_time()
         date = current_time()  #convert_date(timestamp_date)
         message = Message(from_user.User.id, to_user.id, message_text, date)
-        messages_store.store.append(message)
+        session.add(message)
         session.commit()
         session.close()
         self.write_response(responses.Response("message_has_delivered"))
@@ -201,15 +222,25 @@ class ServerHandler(BaseHTTPRequestHandler):
         user.User.last_active = current_time()  #convert_date(var_current_time)
         session.add(user.User)
         session.commit()
-        messages_to_read = []
+        #messages_to_read = []
         #since_date = convert_date(since_date)
-        for message in messages_store.store:
-            if message.to_user_id == user.User.id and \
-                    message.date >= since_date:
-                messages_to_read.append(message)
+        #for message in messages_store.store:
+        #    if message.to_user_id == user.User.id and \
+         #           message.date >= since_date:
+         #       messages_to_read.append(message)
 
+        messages_to_read = session.query(Message).filter(
+            messages.c.to_user_id == user.User.id
+        ).all() # todo filter since_date
+
+        print(f'messages_to_read: {messages_to_read}')
+
+        #formatted_messages_to_read = object_to_list(messages_to_read)
+        #print(f'messages_to_read_SQL: {formatted_messages_to_read}')
         self.write_response(
-            responses.ReadMessagesResponse(messages_to_read, int(user.User.last_active))
+            responses.ReadMessagesResponse(
+                messages_to_read, int(user.User.last_active)
+            )
         )
         session.close()
 
@@ -288,11 +319,11 @@ class ServerHandler(BaseHTTPRequestHandler):
         ))
 
 
-class MessagesStore:
-    store = []
+#class MessagesStore:
+#    store = []
 
 
-messages_store = MessagesStore()
+#messages_store = MessagesStore()
 
 
 def run_server():
