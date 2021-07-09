@@ -231,7 +231,17 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         messages_to_read = session.query(Message).filter(
             messages.c.to_user_id == user.User.id
-        ).all() # todo filter since_date
+        ).all()  # todo filter since_date
+
+        '''messages_to_read = []
+        for message in ref_messages_to_read:
+            new_message = Message(
+                message.from_user_id,
+                message.to_user_id,
+                message.message,
+                message.date,
+            )
+            messages_to_read.append(new_message)'''
 
         print(f'messages_to_read: {messages_to_read}')
 
