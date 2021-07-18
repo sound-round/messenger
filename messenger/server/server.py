@@ -64,7 +64,15 @@ print("Database opened successfully")'''
 
 
 def create_connection():
-    connection = psycopg2.connect("dbname=messenger user=denis password=qwe")
+    connection = psycopg2.connect(
+        """
+        dbname=messenger 
+        user=denis 
+        password=qwe 
+        host=127.0.0.1 
+        port=5432
+        """
+    )
     return connection
 
 
@@ -126,9 +134,11 @@ class ServerHandler(BaseHTTPRequestHandler):
         with create_connection() as connection:
             with connection.cursor() as cursor:
 
-                user = cursor.execute('SELECT * FROM users WHERE login = (%s);', (login,))
+                cursor.execute('SELECT * FROM users WHERE login = %s', (login,))
+                user = cursor.fetchone()
+                print('user:', user)
                 if user:
-                    self.write_response(responses.Response("user_already_registered"))
+                    self.write_response(responses.Response("user_is_already_registered"))
                     return
                 if len(password) == 0:
                     self.write_response(responses.Response("password_is_missing"))
@@ -140,7 +150,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                     return
                 cursor.execute('INSERT INTO users (login, password) VALUES (%s, %s)', (login, password))
                 connection.commit()
-
+        connection.close()
         self.write_response(responses.Response("user_registered"))
 
     def handle_login(self):
@@ -154,22 +164,38 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("password_is_missing"))
             return
 
-        session = db_session()
-        user = session.query(User).filter(User.login == login).first()
-        if not user:
-            self.write_response(responses.Response("unknown_login"))
-            return
-        if user.password != password:
-            self.write_response(responses.Response("wrong_password"))
-            return
+        with create_connection() as connection:
+            with connection.cursor() as cursor:
 
-        user_auth_token = AuthToken(user.id, generate_auth_token())
-        session.add(user_auth_token)
-        session.commit()
-        self.write_response(
-            responses.LoginResponse(user.id, user_auth_token.auth_token)
-        )
-        session.close()
+                cursor.execute(
+                    "SELECT * FROM users WHERE login = (%s);",
+                    (login,),
+                )
+                user = cursor.fetchone()
+                if not user:
+                    self.write_response(responses.Response("unknown_login"))
+                    return
+                print('SQL_user:', user)
+                user_password = user[2]
+                if user_password != password:
+                    self.write_response(responses.Response("wrong_password"))
+                    return
+
+                user_id = user[0]
+                user_auth_token = generate_auth_token()
+                cursor.execute(
+                    """
+                    INSERT INTO auth_tokens (user_id, auth_token) 
+                    VALUES (%s, %s)
+                    """,
+                    (user_id, user_auth_token)
+                )
+                #user_auth_token = AuthToken(user.id, generate_auth_token())
+                connection.commit()
+                self.write_response(
+                    responses.LoginResponse(user_id, user_auth_token)
+                )
+        connection.close()
         return
 
 
