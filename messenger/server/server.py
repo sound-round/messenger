@@ -33,11 +33,11 @@ import validators
 from messenger.common import responses
 import psycopg2
 import psycopg2.extras
-import sqlalchemy as sa
-from sqlalchemy.orm import mapper, relationship, sessionmaker
+# import sqlalchemy as sa
+# from sqlalchemy.orm import mapper, relationship, sessionmaker
 
 
-engine = sa.create_engine('postgresql+psycopg2://denis:qwe@127.0.0.1/messenger')
+'''engine = sa.create_engine('postgresql+psycopg2://denis:qwe@127.0.0.1/messenger')
 meta = sa.MetaData(engine)
 #todo Column('right_id', Integer, ForeignKey('right.id') if it nessasary
 users = sa.Table(
@@ -60,7 +60,12 @@ mapper(AuthToken, auth_token_manager)
 mapper(Message, messages)
 db_session = sessionmaker(bind=engine)
 db_session.configure()
-print("Database opened successfully")
+print("Database opened successfully")'''
+
+
+def create_connection():
+    connection = psycopg2.connect("dbname=messenger user=denis password=qwe")
+    return connection
 
 
 def object_to_list(object_):
@@ -70,12 +75,15 @@ def object_to_list(object_):
         lines.append(vars(row))
     return lines
 
+
 def current_time():
     return datetime.datetime.utcnow().timestamp() * 1000
+
 
 def convert_date(time):
     time /= 1000
     return datetime.datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S')
+
 
 class ServerHandler(BaseHTTPRequestHandler):
 
@@ -89,7 +97,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     def write_response(self, response):
         self.wfile.write(str.encode(responses.toJSON(response)))
 
-    def do_POST(self):  # noqa: C901
+    def do_POST(self):  # noqa: C901 # TODO how does it work?
         if self.path == "/register":
             self.handle_register()
         if self.path == "/login":
@@ -115,24 +123,23 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("login_is_missing"))
             return
 
+        with create_connection() as connection:
+            with connection.cursor() as cursor:
 
-        session = db_session()
-        SQL_response = session.query(User).filter(User.login == login).first()
-        if SQL_response:
-            self.write_response(responses.Response("user_already_registered"))
-            return
-        if len(password) == 0:
-            self.write_response(responses.Response("password_is_missing"))
-            return
-        if len(password) < 6:
-            self.write_response(responses.Response(
-                "password_must_be_6_or_more_characters_long"
-            ))
-            return
-        user = User(login, password)
-        session.add(user)
-        session.commit()
-        session.close()
+                user = cursor.execute('SELECT * FROM users WHERE login = (%s);', (login,))
+                if user:
+                    self.write_response(responses.Response("user_already_registered"))
+                    return
+                if len(password) == 0:
+                    self.write_response(responses.Response("password_is_missing"))
+                    return
+                if len(password) < 6:
+                    self.write_response(responses.Response(
+                        "password_must_be_6_or_more_characters_long"
+                    ))
+                    return
+                cursor.execute('INSERT INTO users (login, password) VALUES (%s, %s)', (login, password))
+                connection.commit()
 
         self.write_response(responses.Response("user_registered"))
 
@@ -232,7 +239,13 @@ class ServerHandler(BaseHTTPRequestHandler):
         messages_to_read = session.query(Message).filter(
             messages.c.to_user_id == user.User.id
         ).all()  # todo filter since_date
+        tmp = []
+        for m in messages_to_read:
+            #del(m._sa_class_manager)
+            #delattr(m, "_sa_instance_state")
+            tmp.append(m.as_dict())
 
+        messages_to_read = tmp
         '''messages_to_read = []
         for message in ref_messages_to_read:
             new_message = Message(
