@@ -1,5 +1,4 @@
 class Message:
-    #__slots__ = ('from_user_id', 'to_user_id', 'message', 'date')
 
     def __init__(self, from_user_id, to_user_id, message, date):
         self.from_user_id = from_user_id
@@ -7,9 +6,3 @@ class Message:
         self.message = message
         self.date = date
 
-        #self.__dict__ = {
-        #        'from_user_id': self.from_user_id,
-        #        'to_user_id': self.to_user_id,
-        #        'message': self.message,
-        #        'date': self.date,
-        #    }
