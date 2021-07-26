@@ -209,15 +209,15 @@ class ServerHandler(BaseHTTPRequestHandler):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id
+                    SELECT users.id
                     FROM users JOIN auth_tokens 
                     ON users.id = auth_tokens.user_id
                     WHERE auth_tokens.auth_token = %s;
                     """,
                     (auth_token,)
                 )
-                from_user_id = cursor.fetchone()
-
+                from_user = cursor.fetchone()
+                from_user_id = from_user[0]
                 if from_user_id is None:
                     self.write_response(responses.Response("unknown_auth_token"))
                     return
@@ -232,7 +232,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 date = current_time()  #convert_date(timestamp_date)
                 cursor.execute(
                     """          
-                    INSERT INTO messages    
+                    INSERT INTO messages (from_user_id, to_user_id, message, date)    
                     VALUES (%s, %s, %s, %s)
                     """,
                     (from_user_id, to_user_id, message_text, date)
@@ -281,12 +281,13 @@ class ServerHandler(BaseHTTPRequestHandler):
                  #           message.date >= since_date:
                  #       messages_to_read.append(message)
 
-                cursor.execute(  # TODO filter since_date
+                cursor.execute(
                     """
                     SELECT * FROM messages
-                    WHERE to_user_id = %s;
+                    WHERE to_user_id = %s
+                    AND date >= %s;
                     """,
-                    (user_id,)
+                    (user_id, since_date)
                 )
                 messages = cursor.fetchall()
 
@@ -423,11 +424,11 @@ class ServerHandler(BaseHTTPRequestHandler):
                     ''',
                     (login,)
                 )
-                user_to_find_id = cursor.fetchone()
-                if not user_to_find_id:
+                user_to_find = cursor.fetchone()
+                if not user_to_find:
                     self.write_response(responses.Response("user_is_missing"))
                     return
-
+                user_to_find_id = user_to_find[0]
         self.write_response(responses.FindUserIDResponse(
             user_to_find_id,
         ))
