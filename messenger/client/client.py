@@ -15,26 +15,23 @@ import tkinter as tk
 #from tkinter import ttk
 from tkinter import StringVar
 from tkinter import messagebox as mb
-
-from messenger.client.network import global_user_id, get_username
+from messenger.client import network
+from messenger.client.network import get_username
 from messenger.server.messages import Message
-
-
-# TODO class Chat(to_user_id, messages: Message[])
 
 
 class Chat:
     def __init__(self, with_user_id, message):
         self.with_user_id = with_user_id
-        self.messages = []
-        self.messages.append(message)
+        self.messages = [message]
+        # self.messages.append(message)
 
 
 class ChatManager:
     store = []
 
     def add_message(self, message):
-        with_user_id = message.to_user_id if message.to_user_id != global_user_id else message.from_user_id
+        with_user_id = message.to_user_id if message.to_user_id != network.global_user_id else message.from_user_id
         for chat in self.store:
             if chat.with_user_id == with_user_id:
                 chat.messages.append(message)
@@ -121,6 +118,7 @@ def main():
             if response['result'] != "ok":
                 return
             with_user_id = response['user_id']
+            print('with_user_id:', with_user_id)
             chat = chat_manager.get_chat(with_user_id)
 
             remove_all(root)
@@ -156,7 +154,6 @@ def main():
                                 text="Back",
                                 command=return_to_chats)
             back_button.place(x=220, y=525, width=50, height=25)
-
 
             chat_canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
             chat_frame = tk.Frame(chat_canvas, background="#ffffff")
@@ -332,7 +329,7 @@ def main():
             )
             return
         for message in response["messages"]:
-            new_message = Message(message["from_user_id"], global_user_id, message["message"], message["date"])
+            new_message = Message(message["from_user_id"], network.global_user_id, message["message"], message["date"])
             chat_manager.add_message(new_message)
             print("got new message " + str(new_message.__dict__))
 
