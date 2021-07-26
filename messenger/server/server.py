@@ -389,7 +389,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 self.write_response(responses.GetUserResponse(
                     user_to_get_login,
                     user_to_get_avatar_url,
-                    datetime.datetime.timestamp(user_to_get_last_active),
+                    float(user_to_get_last_active),
                 ))
         connection.close()
 
