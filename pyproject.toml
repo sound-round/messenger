@@ -7,6 +7,7 @@ authors = ["denis <yudaev1@gmail.com>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 psycopg2-binary = "^2.9.1"
+postgres = "^3.0.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.9.2"
