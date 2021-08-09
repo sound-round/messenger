@@ -37,7 +37,7 @@ def register(login, password):
 
 
 def do_actual_login(login, password):
-    global global_auth_token, global_user_id
+    global global_auth_token, global_user_id, global_since_date
     request_output = '\n'.join([
         "do actual login network request...",
         f'login: {login}',
@@ -57,6 +57,8 @@ def do_actual_login(login, password):
         response = json.loads(response_text)
         global_auth_token = response.get("auth_token")
         global_user_id = response.get("user_id")
+        if response.get('last_active'):
+            global_since_date = response.get('last_active')
         return response
 
     response_text = '''{
