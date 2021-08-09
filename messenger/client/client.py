@@ -23,6 +23,10 @@ import datetime
 import psycopg2
 
 
+# TODO каждый экран в отдельный файл
+# TODO работа с базой данных в отдельные файлы
+# TODO move client to sqlite
+
 class Chat:
     def __init__(self, with_user_id, messages):
         self.with_user_id = with_user_id
@@ -57,6 +61,7 @@ def current_time():
 #     return
 
 def create_connection():
+   # dbName = "clientDb_" + user_id
     connection = psycopg2.connect(
         """
         dbname=messenger_client 
@@ -113,7 +118,7 @@ def create_tables():
 def main():
 
     def callback():
-        if mb.askyesno('Verify', 'Really quit%s'):
+        if mb.askyesno('Verify', 'Really quit?'):
             mb.showwarning('Yes', quit())
 
     def return_back():
@@ -153,13 +158,9 @@ def main():
             row = 0
             if chat:
                 for message in chat.messages: # TODO this [OK]
-                    message_text = message.message
+                    message_text = message.from_user_id + ": "+ message.message + " " + str(message.date)
                     tk.Label(frame, text=message_text).grid(row=row, column=0)
-                    date = message.date
-                    tk.Label(frame, text=date).grid(row=row + 1, column=1)
-                    #TODO draw thin line separator
-                    tk.Label(frame, text="----------").grid(row=row + 2, column=0)
-                    row = row + 3
+                    row = row + 1
 
             root.after(3000, populate_dialog, frame, chat)
 
@@ -280,7 +281,11 @@ def main():
             chat_scroll_bar.place(x=300, y=25, width=20, height=440)
             chat_canvas.place(x=0, y=25, width=300, height=440)
             chat_canvas.create_window((4, 4), window=chat_frame, anchor="nw")
-            chat_frame.bind("<Configure>", lambda event, canvas=chat_canvas: on_frame_configure(chat_canvas))
+            chat_frame.bind(
+                "<Configure>",
+                lambda event,
+                canvas=chat_canvas: on_frame_configure(chat_canvas),
+            )
 
             populate_dialog(chat_frame, chat)
 
@@ -307,7 +312,6 @@ def main():
                             )
                             return
                         with_user_login = response['login']
-                        tk.Label(frame, text=with_user_login).grid(row=row, column=0)
 
                         cursor.execute(
                             '''
@@ -316,13 +320,12 @@ def main():
                             ''',
                             (last_message_id,)
                         )
+
                         last_message_text = cursor.fetchone()[0]
-                        tk.Label(frame, text=last_message_text).grid(row=row + 1, column=0)
-                        #TODO draw thin line separator
-                        tk.Label(frame, text="----------").grid(row=row + 2, column=0)
-                        #separator = ttk.Separator(frame, orient='horizontal')
-                        #separator.pack(fill='x')
-                        row = row + 3
+
+                        last_message_text = with_user_login + ": " + last_message_text
+                        tk.Label(frame, text=last_message_text).grid(row=row , column=0)
+                        row = row + 1
 
             root.after(3000, populate_chats, frame)
 
@@ -465,7 +468,12 @@ def main():
             )
             return
         for message in response["messages"]:
-            new_message = Message(message["from_user_id"], network.global_user_id, message["message"], message["date"])
+            new_message = Message(
+                message["from_user_id"],
+                network.global_user_id,
+                message["message"],
+                message["date"],
+            )
             with create_connection() as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(
