@@ -1,13 +1,6 @@
 import tkinter as tk
-#from tkinter import ttk
 from tkinter import StringVar
-from tkinter import messagebox as mb
 from messenger.client import network
-from messenger.client.network import get_username
-from messenger.server.messages import Message
-import sqlite3
-import datetime
-import psycopg2
 from messenger.client.support import remove_all, add_menu, get_back_button, get_quit_button
 from messenger.client import mainmenu
 from messenger.client import chats_menu
@@ -34,6 +27,7 @@ def display_login_ui(root):
         if response['result'] != "ok":
             return
         chats_menu.display_chats_ui(root)
+        # create_tables()???
 
     login_button = tk.Button(root,
                              text="do Login",
