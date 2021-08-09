@@ -38,3 +38,83 @@ def create_tables():
         );''')
     connection.commit()
     connection.close()
+
+
+def get_chats():
+    with create_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                '''
+                SELECT * FROM chats;
+                '''
+            )
+            chats = cursor.fetchall()
+
+            return chats
+
+
+def get_last_message_text(last_message_id):
+    with create_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                '''
+                SELECT message FROM messages
+                WHERE id = %s;
+                ''',
+                (last_message_id,)
+            )
+            last_message_text = cursor.fetchone()[0]
+            return last_message_text
+
+
+def add_message(
+    from_user_id, to_user_id, message, date
+):
+    with create_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                '''INSERT INTO messages (from_user_id, to_user_id, message, date)
+                VALUES (%s, %s, %s, %s);''',
+                (
+                    from_user_id, to_user_id, message, date
+                )
+            )
+            connection.commit()
+
+            cursor.execute(
+                '''
+                SELECT id FROM messages
+                WHERE from_user_id = %s
+                AND date = %s;
+                ''',
+                (from_user_id, date)
+            )
+
+            new_message_id = cursor.fetchone()[0]
+
+            cursor.execute(
+                '''
+                SELECT * FROM chats
+                WHERE with_user_id = %s;
+                ''',
+                (from_user_id,)
+            )
+            chat = cursor.fetchone()
+            if chat:
+                cursor.execute(
+                    '''
+                    UPDATE chats
+                    SET last_message_id = %s
+                    WHERE with_user_id = %s;
+                    ''',
+                    (new_message_id, from_user_id)
+                )
+            else:
+                cursor.execute(
+                    '''
+                    INSERT INTO chats (with_user_id, last_message_id)
+                    VALUES (%s, %s);
+                    ''',
+                    (from_user_id, new_message_id)
+                )
+            connection.commit()
