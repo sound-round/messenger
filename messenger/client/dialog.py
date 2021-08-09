@@ -2,13 +2,11 @@ import tkinter as tk
 from tkinter import StringVar
 from messenger.client import network
 from messenger.server.messages import Message
-import datetime
-from messenger.client import support, chats_menu
+from messenger.client import support, chats_menu, sql
 from messenger.client.sql import create_connection, create_tables
 
 
-def current_time():
-    return datetime.datetime.utcnow().timestamp() * 1000
+
 
 
 class Chat:
@@ -91,61 +89,11 @@ def open_dialog(root, entry):
         result_text.set(
            ''.join(["result= ", response['result']])
         )
-
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
-                date = current_time()
-                cursor.execute(
-                    '''
-                    INSERT INTO messages (from_user_id, to_user_id, message, date)
-                    VALUES (%s, %s, %s, %s);
-                    ''',
-                    (
-                        network.global_user_id,
-                        to_user_id,
-                        message_to_send,
-                        date,
-                    )
-                )
-                connection.commit()
-
-                cursor.execute(
-                    '''
-                    SELECT id FROM messages
-                    WHERE from_user_id = %s
-                    AND date = %s;
-                    ''',
-                    (network.global_user_id, date)
-                )
-
-                new_message_id = cursor.fetchone()[0]
-
-                cursor.execute(
-                    '''
-                    SELECT * FROM chats
-                    WHERE with_user_id = %s;
-                    ''',
-                    (to_user_id,)
-                )
-                chat = cursor.fetchone()
-                if chat:
-                    cursor.execute(
-                        '''
-                        UPDATE chats
-                        SET last_message_id = %s
-                        WHERE with_user_id = %s;
-                        ''',
-                        (new_message_id, to_user_id)
-                    )
-                else:
-                    cursor.execute(
-                        '''
-                        INSERT INTO chats
-                        VALUES (with_user_id, last_message_id);
-                        ''',
-                        (to_user_id, new_message_id)
-                    )
-                connection.commit()
+        sql.send_message(
+            network.global_user_id,
+            to_user_id,
+            message_to_send,
+        )
 
         result_label = tk.Label(root, textvariable=result_text)
         result_label.place(x=10, y=470, width=250, height=20)
