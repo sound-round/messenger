@@ -158,7 +158,7 @@ def main():
             row = 0
             if chat:
                 for message in chat.messages: # TODO this [OK]
-                    message_text = message.from_user_id + ": "+ message.message + " " + str(message.date)
+                    message_text = str(message.from_user_id) + ": "+ message.message + " " + str(message.date)
                     tk.Label(frame, text=message_text).grid(row=row, column=0)
                     row = row + 1
 
