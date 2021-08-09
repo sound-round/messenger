@@ -182,6 +182,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                     return
 
                 user_id = user[0]
+                user_last_active = user[4]
                 user_auth_token = generate_auth_token()
                 cursor.execute(
                     """
@@ -192,7 +193,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 )
                 connection.commit()
                 self.write_response(
-                    responses.LoginResponse(user_id, user_auth_token)
+                    responses.LoginResponse(user_id, user_auth_token, float(user_last_active))
                 )
         connection.close()
         return
