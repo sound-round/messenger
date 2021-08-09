@@ -8,47 +8,112 @@ from messenger.client import network
 # типы клиента
 # 1) Command line client -
 # 2) Desktop ui client - tkinter,
-# 3) web client - some python web libraries?
+# 3) web client - some python web libraries%s
 
 
 import tkinter as tk
 #from tkinter import ttk
 from tkinter import StringVar
 from tkinter import messagebox as mb
-
-from messenger.client.network import global_user_id, get_username
+from messenger.client import network
+from messenger.client.network import get_username
 from messenger.server.messages import Message
+import sqlite3
+import datetime
+import psycopg2
 
 
-# TODO class Chat(to_user_id, messages: Message[])
-
+# TODO каждый экран в отдельный файл
+# TODO работа с базой данных в отдельные файлы
+# TODO move client to sqlite
 
 class Chat:
-    def __init__(self, with_user_id, message):
+    def __init__(self, with_user_id, messages):
         self.with_user_id = with_user_id
-        self.messages = []
-        self.messages.append(message)
+        self.messages = messages  # TODO CHECK: list is required
+        # self.messages.append(message)
 
 
-class ChatManager:
-    store = []
+#class ChatManager:
+#    store = []
+#
+#    def add_message(self, message):
+#        with_user_id = message.to_user_id if message.to_user_id != network.global_user_id else message.from_user_id
+#        for chat in self.store:
+#            if chat.with_user_id == with_user_id:
+#                chat.messages.append(message)
+#                print("add message to existing chat " + str(chat.__dict__))
+#                return
+#        self.store.append(Chat(with_user_id, message))
+#
+#    def get_chat(self, with_user_id):
+#        for chat in self.store:
+#            if chat.with_user_id == with_user_id:
+#                return chat
 
-    def add_message(self, message):
-        with_user_id = message.to_user_id if message.to_user_id != global_user_id else message.from_user_id
-        for chat in self.store:
-            if chat.with_user_id == with_user_id:
-                chat.messages.append(message)
-                print("add message to existing chat " + str(chat.__dict__))
-                return
-        self.store.append(Chat(with_user_id, message))
 
-    def get_chat(self, with_user_id):
-        for chat in self.store:
-            if chat.with_user_id == with_user_id:
-                return chat
+def current_time():
+    return datetime.datetime.utcnow().timestamp() * 1000
 
 
-chat_manager = ChatManager()
+# def create_connection():
+#     connection = sqlite3.connect('messenger.db')
+#     return
+
+def create_connection():
+   # dbName = "clientDb_" + user_id
+    connection = psycopg2.connect(
+        """
+        dbname=messenger_client 
+        user=denis 
+        password=qwe 
+        host=127.0.0.1 
+        port=5432
+        """
+    )
+    return connection
+
+
+def get_chat(with_user_id):
+    with create_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM messages
+                WHERE from_user_id = %s
+                OR to_user_id = %s;
+                """,
+                (with_user_id, with_user_id)
+            )
+            messages = cursor.fetchall()
+            final_messages = []
+            for message in messages:
+                formatted_message = Message(
+                    message[1], message[2], message[3], message[4],
+                )
+                final_messages.append(formatted_message)
+            return Chat(with_user_id, final_messages)
+
+
+def create_tables():
+    connection = create_connection()
+    cursor = connection.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
+            id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+            from_user_id bigint,
+            to_user_id bigint,
+            message text,
+            date numeric
+        );''')
+    connection.commit()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS chats (
+            id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+            with_user_id bigint UNIQUE,
+            last_message_id bigint REFERENCES messages(id)
+        );''')
+    connection.commit()
+    connection.close()
+# chat_manager = ChatManager()
 
 def main():
 
@@ -92,14 +157,10 @@ def main():
             remove_all(frame)
             row = 0
             if chat:
-                for message in chat.messages:
-                    message_text = message.message
+                for message in chat.messages: # TODO this [OK]
+                    message_text = str(message.from_user_id) + ": "+ message.message + " " + str(message.date)
                     tk.Label(frame, text=message_text).grid(row=row, column=0)
-                    date = message.date
-                    tk.Label(frame, text=date).grid(row=row + 1, column=1)
-                    #TODO draw thin line separator
-                    tk.Label(frame, text="----------").grid(row=row + 2, column=0)
-                    row = row + 3
+                    row = row + 1
 
             root.after(3000, populate_dialog, frame, chat)
 
@@ -121,7 +182,8 @@ def main():
             if response['result'] != "ok":
                 return
             with_user_id = response['user_id']
-            chat = chat_manager.get_chat(with_user_id)
+            print('with_user_id:', with_user_id)
+            chat = get_chat(with_user_id)  # TODO this [OK]
 
             remove_all(root)
 
@@ -140,6 +202,61 @@ def main():
                    ''.join(["result= ", response['result']])
                 )
 
+                with create_connection() as connection:
+                    with connection.cursor() as cursor:
+                        date = current_time()
+                        cursor.execute(
+                            '''
+                            INSERT INTO messages (from_user_id, to_user_id, message, date)
+                            VALUES (%s, %s, %s, %s);
+                            ''',
+                            (
+                                network.global_user_id,
+                                to_user_id,
+                                message_to_send,
+                                date,
+                            )
+                        )
+                        connection.commit()
+
+                        cursor.execute(
+                            '''
+                            SELECT id FROM messages
+                            WHERE from_user_id = %s
+                            AND date = %s;
+                            ''',
+                            (network.global_user_id, date)
+                        )
+
+                        new_message_id = cursor.fetchone()[0]
+
+                        cursor.execute(
+                            '''
+                            SELECT * FROM chats
+                            WHERE with_user_id = %s;
+                            ''',
+                            (to_user_id,)
+                        )
+                        chat = cursor.fetchone()
+                        if chat:
+                            cursor.execute(
+                                '''
+                                UPDATE chats
+                                SET last_message_id = %s
+                                WHERE with_user_id = %s;
+                                ''',
+                                (new_message_id, to_user_id)
+                            )
+                        else:
+                            cursor.execute(
+                                '''
+                                INSERT INTO chats
+                                VALUES (with_user_id, last_message_id);
+                                ''',
+                                (to_user_id, new_message_id)
+                            )
+                        connection.commit()
+
                 result_label = tk.Label(root, textvariable=result_text)
                 result_label.place(x=10, y=470, width=250, height=20)
 
@@ -157,7 +274,6 @@ def main():
                                 command=return_to_chats)
             back_button.place(x=220, y=525, width=50, height=25)
 
-
             chat_canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
             chat_frame = tk.Frame(chat_canvas, background="#ffffff")
             chat_scroll_bar = tk.Scrollbar(root, orient="vertical", command=chat_canvas.yview)
@@ -165,7 +281,11 @@ def main():
             chat_scroll_bar.place(x=300, y=25, width=20, height=440)
             chat_canvas.place(x=0, y=25, width=300, height=440)
             chat_canvas.create_window((4, 4), window=chat_frame, anchor="nw")
-            chat_frame.bind("<Configure>", lambda event, canvas=chat_canvas: on_frame_configure(chat_canvas))
+            chat_frame.bind(
+                "<Configure>",
+                lambda event,
+                canvas=chat_canvas: on_frame_configure(chat_canvas),
+            )
 
             populate_dialog(chat_frame, chat)
 
@@ -174,22 +294,38 @@ def main():
                 return
             remove_all(frame)
             row = 0
-            for chat in chat_manager.store:
-                response = get_username(chat.with_user_id)
-                if response['result'] != "ok":
-                    result_text.set(
-                        ''.join(["result= ", response['result']])
+            with create_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        '''
+                        SELECT * FROM chats;
+                        '''
                     )
-                    return
-                with_user_login = response['login']
-                tk.Label(frame, text=with_user_login).grid(row=row, column=0)
-                last_message_text = chat.messages[-1].message
-                tk.Label(frame, text=last_message_text).grid(row=row + 1, column=0)
-                #TODO draw thin line separator
-                tk.Label(frame, text="----------").grid(row=row + 2, column=0)
-                #separator = ttk.Separator(frame, orient='horizontal')
-                #separator.pack(fill='x')
-                row = row + 3
+                    chats = cursor.fetchall()
+                    for chat in chats: # TODO this
+                        with_user_id = chat[1]
+                        last_message_id = chat[2]
+                        response = get_username(with_user_id)
+                        if response['result'] != "ok":
+                            result_text.set(
+                                ''.join(["result= ", response['result']])
+                            )
+                            return
+                        with_user_login = response['login']
+
+                        cursor.execute(
+                            '''
+                            SELECT message FROM messages
+                            WHERE id = %s;
+                            ''',
+                            (last_message_id,)
+                        )
+
+                        last_message_text = cursor.fetchone()[0]
+
+                        last_message_text = with_user_login + ": " + last_message_text
+                        tk.Label(frame, text=last_message_text).grid(row=row , column=0)
+                        row = row + 1
 
             root.after(3000, populate_chats, frame)
 
@@ -332,11 +468,69 @@ def main():
             )
             return
         for message in response["messages"]:
-            new_message = Message(message["from_user_id"], global_user_id, message["message"], message["date"])
-            chat_manager.add_message(new_message)
+            new_message = Message(
+                message["from_user_id"],
+                network.global_user_id,
+                message["message"],
+                message["date"],
+            )
+            with create_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        '''INSERT INTO messages (from_user_id, to_user_id, message, date)
+                        VALUES (%s, %s, %s, %s);''',
+                        (
+                            message['from_user_id'],
+                            message['to_user_id'],
+                            message['message'],
+                            message['date'],
+                         )
+                    )
+                    connection.commit()
+
+                    cursor.execute(
+                        '''
+                        SELECT id FROM messages
+                        WHERE from_user_id = %s
+                        AND date = %s;
+                        ''',
+                        (message["from_user_id"], message['date'])
+                    )
+
+                    new_message_id = cursor.fetchone()[0]
+
+                    cursor.execute(
+                        '''
+                        SELECT * FROM chats
+                        WHERE with_user_id = %s;
+                        ''',
+                        (message["from_user_id"],)
+                    )
+                    chat = cursor.fetchone()
+                    if chat:
+                        cursor.execute(
+                            '''
+                            UPDATE chats
+                            SET last_message_id = %s
+                            WHERE with_user_id = %s;
+                            ''',
+                            (new_message_id, message["from_user_id"],)
+                        )
+                    else:
+                        cursor.execute(
+                            '''
+                            INSERT INTO chats (with_user_id, last_message_id)
+                            VALUES (%s, %s);
+                            ''',
+                            (message["from_user_id"], new_message_id)
+                        )
+                    connection.commit()
+            # chat_manager.add_message(new_message)
             print("got new message " + str(new_message.__dict__))
 
         root.after(3000, run_update_loop, result_text)
+
+    create_tables()
 
     root = tk.Tk()
     root.title("messenger")
