@@ -10,11 +10,11 @@ class Response(object):
 
 class LoginResponse(Response):
 
-    def __init__(self, user_id, auth_token):
+    def __init__(self, user_id, auth_token, last_active):
         super().__init__("ok")
         self.user_id = user_id
         self.auth_token = auth_token
-
+        self.last_active = last_active
 
 class GetUserResponse(Response):
 
