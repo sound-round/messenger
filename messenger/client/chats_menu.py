@@ -3,8 +3,7 @@ from tkinter import StringVar
 from messenger.client import network
 from messenger.client.network import get_username
 from messenger.server.messages import Message
-from messenger.client import support, mainmenu, dialog
-from messenger.client.sql import create_connection
+from messenger.client import support, mainmenu, dialog, sql
 
 
 def display_chats_ui(root):
@@ -14,38 +13,23 @@ def display_chats_ui(root):
             return
         support.remove_all(frame)
         row = 0
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    '''
-                    SELECT * FROM chats;
-                    '''
+        chats = sql.get_chats()
+        for chat in chats:  # TODO this
+            with_user_id = chat[1]
+            last_message_id = chat[2]
+            response = get_username(with_user_id)
+            if response['result'] != "ok":
+                result_text.set(
+                    ''.join(["result= ", response['result']])
                 )
-                chats = cursor.fetchall()
-                for chat in chats: # TODO this
-                    with_user_id = chat[1]
-                    last_message_id = chat[2]
-                    response = get_username(with_user_id)
-                    if response['result'] != "ok":
-                        result_text.set(
-                            ''.join(["result= ", response['result']])
-                        )
-                        return
-                    with_user_login = response['login']
+                return
+            with_user_login = response['login']
 
-                    cursor.execute(
-                        '''
-                        SELECT message FROM messages
-                        WHERE id = %s;
-                        ''',
-                        (last_message_id,)
-                    )
+            last_message_text = sql.get_last_message_text(last_message_id)
 
-                    last_message_text = cursor.fetchone()[0]
-
-                    last_message_text = with_user_login + ": " + last_message_text
-                    tk.Label(frame, text=last_message_text).grid(row=row , column=0)
-                    row = row + 1
+            last_message = with_user_login + ": " + last_message_text
+            tk.Label(frame, text=last_message).grid(row=row, column=0)
+            row = row + 1
 
         root.after(3000, populate_chats, frame)
 
@@ -98,57 +82,12 @@ def run_update_loop(result_text, root):
             message["message"],
             message["date"],
         )
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    '''INSERT INTO messages (from_user_id, to_user_id, message, date)
-                    VALUES (%s, %s, %s, %s);''',
-                    (
-                        message['from_user_id'],
-                        message['to_user_id'],
-                        message['message'],
-                        message['date'],
-                     )
-                )
-                connection.commit()
-
-                cursor.execute(
-                    '''
-                    SELECT id FROM messages
-                    WHERE from_user_id = %s
-                    AND date = %s;
-                    ''',
-                    (message["from_user_id"], message['date'])
-                )
-
-                new_message_id = cursor.fetchone()[0]
-
-                cursor.execute(
-                    '''
-                    SELECT * FROM chats
-                    WHERE with_user_id = %s;
-                    ''',
-                    (message["from_user_id"],)
-                )
-                chat = cursor.fetchone()
-                if chat:
-                    cursor.execute(
-                        '''
-                        UPDATE chats
-                        SET last_message_id = %s
-                        WHERE with_user_id = %s;
-                        ''',
-                        (new_message_id, message["from_user_id"],)
-                    )
-                else:
-                    cursor.execute(
-                        '''
-                        INSERT INTO chats (with_user_id, last_message_id)
-                        VALUES (%s, %s);
-                        ''',
-                        (message["from_user_id"], new_message_id)
-                    )
-                connection.commit()
+        sql.add_message(
+            message["from_user_id"],
+            network.global_user_id,
+            message["message"],
+            message["date"],
+        )
         print("got new message " + str(new_message.__dict__))
 
     root.after(3000, run_update_loop, result_text, root)
