@@ -2,8 +2,8 @@ import tkinter as tk
 from tkinter import StringVar
 from messenger.client import network
 from messenger.client.support import remove_all, add_menu, get_back_button, get_quit_button
-from messenger.client import mainmenu
-from messenger.client import chats_menu
+from messenger.client import mainmenu, chats_menu, sql
+
 
 def display_login_ui(root):
     remove_all(root)
@@ -27,7 +27,7 @@ def display_login_ui(root):
         if response['result'] != "ok":
             return
         chats_menu.display_chats_ui(root)
-        # create_tables()???
+        # sql.create_tables(network.global_user_id)
 
     login_button = tk.Button(root,
                              text="do Login",
