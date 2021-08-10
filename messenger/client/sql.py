@@ -185,3 +185,18 @@ def send_message(
                     (to_user_id, new_message_id)
                 )
             connection.commit()
+
+
+def get_messages(with_user_id):
+    with create_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM messages
+                WHERE from_user_id = %s
+                OR to_user_id = %s;
+                """,
+                (with_user_id, with_user_id)
+            )
+            messages = cursor.fetchall()
+            return messages
