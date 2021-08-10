@@ -3,10 +3,6 @@ from tkinter import StringVar
 from messenger.client import network
 from messenger.server.messages import Message
 from messenger.client import support, chats_menu, sql
-from messenger.client.sql import create_connection, create_tables
-
-
-
 
 
 class Chat:
@@ -16,24 +12,14 @@ class Chat:
 
 
 def get_chat(with_user_id):
-    with create_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT * FROM messages
-                WHERE from_user_id = %s
-                OR to_user_id = %s;
-                """,
-                (with_user_id, with_user_id)
-            )
-            messages = cursor.fetchall()
-            final_messages = []
-            for message in messages:
-                formatted_message = Message(
-                    message[1], message[2], message[3], message[4],
-                )
-                final_messages.append(formatted_message)
-            return Chat(with_user_id, final_messages)
+    messages = sql.get_messages(with_user_id)
+    final_messages = []
+    for message in messages:
+        formatted_message = Message(
+            message[1], message[2], message[3], message[4],
+        )
+        final_messages.append(formatted_message)
+    return Chat(with_user_id, final_messages)
 
 
 def populate_dialog(frame, chat, root):
