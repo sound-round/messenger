@@ -22,18 +22,18 @@ def get_chat(with_user_id):
     return Chat(with_user_id, final_messages)
 
 
-def populate_dialog(frame, chat, root):
+def populate_dialog(frame, chat, root, with_user_login):
     if not frame.winfo_exists():
         return
     support.remove_all(frame)
     row = 0
     if chat:
         for message in chat.messages:  # TODO this [OK]
-            message_text = str(message.from_user_id) + ": " + message.message + " " + str(message.date)
+            message_text = str(with_user_login) + ": " + message.message + " " + str(message.date)
             tk.Label(frame, text=message_text).grid(row=row, column=0)
             row = row + 1
 
-    root.after(3000, populate_dialog, frame, chat, root)
+    root.after(3000, populate_dialog, frame, chat, root, with_user_login)
 
 
 def return_to_chats(root):
@@ -41,22 +41,8 @@ def return_to_chats(root):
     chats_menu.display_chats_ui(root)
 
 
-def open_dialog(root, entry):
-    result_text = StringVar()
-    login = entry.get()
-    if not login:
-        result_text.set(
-            'login_is_missing'
-        )
-        return
-    response = network.find_user_id(login)
-    result_text.set(
-        ''.join(["result= ", response['result']])
-    )
-    if response['result'] != "ok":
-        return
-    with_user_id = response['user_id']
-    print('with_user_id:', with_user_id)
+def display_dialog(root, with_user_id, login):
+
     chat = get_chat(with_user_id)  # TODO this [OK]
 
     support.remove_all(root)
@@ -111,4 +97,4 @@ def open_dialog(root, entry):
         canvas=chat_canvas: support.on_frame_configure(chat_canvas),
     )
 
-    populate_dialog(chat_frame, chat, root)
+    populate_dialog(chat_frame, chat, root, login)

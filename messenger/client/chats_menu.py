@@ -33,11 +33,30 @@ def display_chats_ui(root):
 
         root.after(3000, populate_chats, frame)
 
+    def open_dialog():
+        login = entry.get()
+        if not login:
+            result_text.set(
+                'login_is_missing'
+            )
+            return
+        response = network.find_user_id(login)
+        result_text.set(
+            ''.join(["result= ", response['result']])
+        )
+        if response['result'] != "ok":
+            return
+        with_user_id = response['user_id']
+        if with_user_id == network.global_user_id:
+            result_text.set("can't_open_chat")
+            return
+        dialog.display_dialog(root, with_user_id, login)
+
     support.remove_all(root)
 
     chat_label = tk.Label(root, text="ChatManager")
     login_label = tk.Label(root, text="Enter user login: ")
-    start_chat = tk.Button(root, text="Start chat", command=lambda: dialog.open_dialog(root, entry))
+    start_chat = tk.Button(root, text="Start chat", command=lambda: open_dialog())
     back_button = support.get_back_button(root, mainmenu.display_mainmenu)
 
     chat_label.place(x=10, y=0, width=100, height=20)
