@@ -37,12 +37,12 @@ def create_tables():
             date numeric
         );''')
     connection.commit()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS chats (
-            id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-            with_user_id bigint UNIQUE,
-            last_message_id bigint REFERENCES messages(id)
-        );''')
-    connection.commit()
+    #cursor.execute('''CREATE TABLE IF NOT EXISTS chats (
+    #        id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    #        with_user_id bigint UNIQUE,
+    #        last_message_id bigint REFERENCES messages(id)
+    #    );''')
+    #connection.commit()
     connection.close()
 
 
@@ -124,6 +124,7 @@ def add_message(
                     (from_user_id, new_message_id)
                 )
             connection.commit()
+
 
 def send_message(
         from_user_id,
