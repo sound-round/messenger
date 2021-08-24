@@ -31,8 +31,7 @@ from messenger.server.messages import Message
 from messenger.common.user import generate_auth_token, AuthToken, User
 import validators
 from messenger.common import responses
-import psycopg2
-import psycopg2.extras
+from messenger.server import sql
 # import sqlalchemy as sa
 # from sqlalchemy.orm import mapper, relationship, sessionmaker
 
@@ -63,17 +62,17 @@ db_session.configure()
 print("Database opened successfully")'''
 
 
-def create_connection():
-    connection = psycopg2.connect(
-        """
-        dbname=messenger 
-        user=denis 
-        password=qwe 
-        host=127.0.0.1 
-        port=5432
-        """
-    )
-    return connection
+# def create_connection():
+#     connection = psycopg2.connect(
+#         """
+#         dbname=messenger
+#         user=denis
+#         password=qwe
+#         host=127.0.0.1
+#         port=5432
+#         """
+#     )
+#     return connection
 
 
 def object_to_list(object_):
@@ -131,26 +130,21 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("login_is_missing"))
             return
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
+        user = sql.get_user(login)
+        print('user:', user)
+        if user:
+            self.write_response(responses.Response("user_is_already_registered"))
+            return
+        if len(password) == 0:
+            self.write_response(responses.Response("password_is_missing"))
+            return
+        if len(password) < 6:
+            self.write_response(responses.Response(
+                "password_must_be_6_or_more_characters_long"
+            ))
+            return
+        sql.register_user(login, password)
 
-                cursor.execute('SELECT * FROM users WHERE login = %s;', (login,))
-                user = cursor.fetchone()
-                print('user:', user)
-                if user:
-                    self.write_response(responses.Response("user_is_already_registered"))
-                    return
-                if len(password) == 0:
-                    self.write_response(responses.Response("password_is_missing"))
-                    return
-                if len(password) < 6:
-                    self.write_response(responses.Response(
-                        "password_must_be_6_or_more_characters_long"
-                    ))
-                    return
-                cursor.execute('INSERT INTO users (login, password) VALUES (%s, %s);', (login, password))
-                connection.commit()
-        connection.close()
         self.write_response(responses.Response("user_registered"))
 
     def handle_login(self):
@@ -164,40 +158,24 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.write_response(responses.Response("password_is_missing"))
             return
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
+        user = sql.get_user(login)
+        if not user:
+            self.write_response(responses.Response("unknown_login"))
+            return
+        print('SQL_user:', user)
+        user_password = user[2]
+        if user_password != password:
+            self.write_response(responses.Response("wrong_password"))
+            return
 
-                cursor.execute(
-                    "SELECT * FROM users WHERE login = (%s);",
-                    (login,),
-                )
-                user = cursor.fetchone()
-                if not user:
-                    self.write_response(responses.Response("unknown_login"))
-                    return
-                print('SQL_user:', user)
-                user_password = user[2]
-                if user_password != password:
-                    self.write_response(responses.Response("wrong_password"))
-                    return
-
-                user_id = user[0]
-                user_last_active = user[4]
-                user_auth_token = generate_auth_token()
-                cursor.execute(
-                    """
-                    INSERT INTO auth_tokens (user_id, auth_token) 
-                    VALUES (%s, %s);
-                    """,
-                    (user_id, user_auth_token)
-                )
-                connection.commit()
-                self.write_response(
-                    responses.LoginResponse(user_id, user_auth_token, float(user_last_active))
-                )
-        connection.close()
+        user_id = user[0]
+        user_last_active = user[4]
+        user_auth_token = generate_auth_token()
+        sql.create_auth_token(user_id, user_auth_token)
+        self.write_response(
+            responses.LoginResponse(user_id, user_auth_token, float(user_last_active))
+        )
         return
-
 
     def handle_send_message(self):
         post_body = self.get_post_body()
@@ -206,108 +184,53 @@ class ServerHandler(BaseHTTPRequestHandler):
         to_user_id = json.loads(post_body)['to_user_id']
         message_text = json.loads(post_body)['message']
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT users.id
-                    FROM users JOIN auth_tokens 
-                    ON users.id = auth_tokens.user_id
-                    WHERE auth_tokens.auth_token = %s;
-                    """,
-                    (auth_token,)
-                )
-                from_user = cursor.fetchone()
-                from_user_id = from_user[0]
-                if from_user_id is None:
-                    self.write_response(responses.Response("unknown_auth_token"))
-                    return
-                if not to_user_id:
-                    self.write_response(responses.Response("user_is_missing"))
-                    return
+        from_user_id = sql.get_user_id(auth_token)
+        if from_user_id is None:
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
+        if not to_user_id:
+            self.write_response(responses.Response("user_is_missing"))
+            return
 
-                if len(message_text) == 0:
-                    self.write_response(responses.Response("message_is_missing"))
-                    return
-                #timestamp_date = current_time()
-                date = current_time()  #convert_date(timestamp_date)
-                cursor.execute(
-                    """          
-                    INSERT INTO messages (from_user_id, to_user_id, message, date)    
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (from_user_id, to_user_id, message_text, date)
-                )
-                connection.commit()
-        connection.close()
+        if len(message_text) == 0:
+            self.write_response(responses.Response("message_is_missing"))
+            return
+        #timestamp_date = current_time()
+        date = current_time()  #convert_date(timestamp_date)
+        sql.add_message(from_user_id, to_user_id, message_text, date)
+
         self.write_response(responses.Response("message_has_delivered"))
-
 
     def handle_read_message(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         since_date = json.loads(post_body)['since_date']
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
+        user = sql.get_user_by_auth_token(auth_token)
+        if not user:
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
+        #var_current_time = current_time()
+        cur_time = current_time()  #convert_date(var_current_time)
+        user_id = user[0]
+        sql.update_last_active(cur_time, user_id)
 
-                cursor.execute(
-                    """
-                    SELECT *
-                    FROM users JOIN auth_tokens 
-                    ON users.id = auth_tokens.user_id
-                    WHERE auth_tokens.auth_token = %s;
-                    """,
-                    (auth_token,)
-                )
-                user = cursor.fetchone()
-                if not user:
-                    self.write_response(responses.Response("unknown_auth_token"))
-                    return
-                #var_current_time = current_time()
-                user_id = user[0]
-                cur_time = current_time()  #convert_date(var_current_time)
+        messages = sql.get_messages(user_id, since_date)
+        messages_to_read = []
+        for message in messages:
+            new_message = Message(
+                message[1],
+                message[2],
+                message[3],
+                float(message[4]),
+            )
+            messages_to_read.append(new_message)
 
-                sql_request = """
-                    UPDATE users
-                    SET last_active = %s
-                    WHERE id = %s
-                    """
-                cursor.execute(sql_request, (cur_time, user_id))
-                connection.commit()
-                #messages_to_read = []
-                #since_date = convert_date(since_date)
-                #for message in messages_store.store:
-                #    if message.to_user_id == user.User.id and \
-                 #           message.date >= since_date:
-                 #       messages_to_read.append(message)
-
-                cursor.execute(
-                    """
-                    SELECT * FROM messages
-                    WHERE to_user_id = %s
-                    AND date >= %s;
-                    """,
-                    (user_id, since_date)
-                )
-                messages = cursor.fetchall()
-
-                messages_to_read = []
-                for message in messages:
-                    new_message = Message(
-                        message[1],
-                        message[2],
-                        message[3],
-                        float(message[4]),
-                    )
-                    messages_to_read.append(new_message)
-
-                self.write_response(
-                    responses.ReadMessagesResponse(
-                        messages_to_read, float(cur_time)
-                    )
-                )
-        connection.close()
+        self.write_response(
+            responses.ReadMessagesResponse(
+                messages_to_read, float(cur_time)
+            )
+        )
 
     # setAvatar - set avatar - params: auth_token, avatar_url
     def handle_set_avatar(self):
@@ -315,39 +238,18 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         avatar_url = json.loads(post_body)['avatar_url']
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
-
-                cursor.execute(
-                    '''
-                    SELECT *
-                    FROM users
-                    JOIN auth_tokens
-                    ON users.id = auth_tokens.user_id
-                    WHERE auth_tokens.auth_token = %s;
-                    ''',
-                    (auth_token,)
-                )
-                user = cursor.fetchone()
-                if not user:
-                    self.write_response(responses.Response("unknown_auth_token"))
-                    return
-                if len(avatar_url) == 0:
-                    self.write_response(responses.Response("url_is_missing"))
-                    return
-                if not validators.url(avatar_url):
-                    self.write_response(responses.Response("url_is_not_valid"))
-                    return
-
-                user_id = user[0]
-                sql_request = '''
-                    UPDATE users
-                    SET avatar_url = %s
-                    WHERE id = %s
-                    '''
-                cursor.execute(sql_request, (avatar_url, user_id))
-                connection.commit()
-        connection.close()
+        user = sql.get_user_by_auth_token(auth_token)
+        if not user:
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
+        if len(avatar_url) == 0:
+            self.write_response(responses.Response("url_is_missing"))
+            return
+        if not validators.url(avatar_url):
+            self.write_response(responses.Response("url_is_not_valid"))
+            return
+        user_id = user[0]
+        sql.set_avatar(avatar_url, user_id)
         self.write_response(responses.Response("avatar_has_been_set"))
 
     def handle_get_user(self):
@@ -355,81 +257,39 @@ class ServerHandler(BaseHTTPRequestHandler):
         auth_token = json.loads(post_body)['auth_token']
         user_id_to_get = json.loads(post_body)['user_id_to_get']
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
+        user_id = sql.get_user_by_auth_token(auth_token)  # TODO ask if it is needed
+        if not user_id:
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
 
-                cursor.execute(
-                    '''
-                    SELECT *
-                    FROM users
-                    JOIN auth_tokens
-                    ON users.id = auth_tokens.user_id
-                    WHERE auth_tokens.auth_token = %s;
-                    ''',
-                    (auth_token,)
-                )
-                user = cursor.fetchone()
-                if not user:
-                    self.write_response(responses.Response("unknown_auth_token"))
-                    return
-
-                cursor.execute(
-                    '''
-                    SELECT * 
-                    FROM users
-                    WHERE id = %s;
-                    ''',
-                    (user_id_to_get,)
-                )
-                user_to_get = cursor.fetchone()
-                if not user_to_get:
-                    self.write_response(responses.Response("user_is_missing"))
-                    return
-                user_to_get_login = user_to_get[1]
-                user_to_get_avatar_url = user_to_get[3]
-                user_to_get_last_active = user_to_get[4]
-                self.write_response(responses.GetUserResponse(
-                    user_to_get_login,
-                    user_to_get_avatar_url,
-                    float(user_to_get_last_active),
-                ))
-        connection.close()
-
+        user_to_get = sql.get_user_by_id(user_id_to_get)
+        if not user_to_get:
+            self.write_response(responses.Response("user_is_missing"))
+            return
+        user_to_get_login = user_to_get[1]
+        user_to_get_avatar_url = user_to_get[3]
+        user_to_get_last_active = user_to_get[4]
+        self.write_response(responses.GetUserResponse(
+            user_to_get_login,
+            user_to_get_avatar_url,
+            float(user_to_get_last_active),
+        ))
 
     def handle_find_user_id(self):
         post_body = self.get_post_body()
         auth_token = json.loads(post_body)['auth_token']
         login = json.loads(post_body)['user_login_to_get']
 
-        with create_connection() as connection:
-            with connection.cursor() as cursor:
+        user_id = sql.get_user_by_auth_token(auth_token)  # TODO ask if it is needed
+        if not user_id:
+            self.write_response(responses.Response("unknown_auth_token"))
+            return
 
-                cursor.execute(
-                    '''
-                    SELECT * 
-                    FROM auth_tokens
-                    WHERE auth_token = %s;
-                    ''',
-                    (auth_token,)
-                )
-                user = cursor.fetchone()
-                if not user:
-                    self.write_response(responses.Response("unknown_auth_token"))
-                    return
-
-                cursor.execute(
-                    '''
-                    SELECT id 
-                    FROM users
-                    WHERE login = %s;
-                    ''',
-                    (login,)
-                )
-                user_to_find = cursor.fetchone()
-                if not user_to_find:
-                    self.write_response(responses.Response("user_is_missing"))
-                    return
-                user_to_find_id = user_to_find[0]
+        user_to_find = sql.get_user(login)
+        if not user_to_find:
+            self.write_response(responses.Response("user_is_missing"))
+            return
+        user_to_find_id = user_to_find[0]
         self.write_response(responses.FindUserIDResponse(
             user_to_find_id,
         ))
